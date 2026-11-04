@@ -169,6 +169,23 @@ static void dma_buf_release(struct dentry *dentry)
 	if (unlikely(!dmabuf))
 		return;
 
+	/*
+	 * timelm debug (TIMELMDMABUF, strip before shipping): img107 hit the
+	 * BUG_ON below at shutdown (last fput from a killed HAL thread with a
+	 * kernel vmap still held).  Name the exporter and the leaker's victim.
+	 */
+	if (unlikely(dmabuf->vmapping_counter ||
+		     dmabuf->cb_in.active || dmabuf->cb_out.active))
+		pr_err("TIMELMDMABUF: release with vmapping_counter=%u cb_in=%d cb_out=%d exp=%s name=%s size=%zu vaddr=%px release=%ps owner=%s comm=%s tgid=%d tid=%d\n",
+		       dmabuf->vmapping_counter, !!dmabuf->cb_in.active,
+		       !!dmabuf->cb_out.active, dmabuf->exp_name,
+		       dmabuf->name ? dmabuf->name : "(none)", dmabuf->size,
+		       dmabuf->vmap_ptr.is_iomem ? NULL : dmabuf->vmap_ptr.vaddr,
+		       dmabuf->ops->release,
+		       dmabuf->owner ? module_name(dmabuf->owner) : "(built-in)",
+		       current->comm, task_tgid_nr(current),
+		       task_pid_nr(current));
+
 	BUG_ON(dmabuf->vmapping_counter);
 
 	/*
