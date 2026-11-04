@@ -359,6 +359,13 @@ static int get_v4l2_plane32(struct v4l2_plane *p64,
 		.m		= m,
 		.data_offset	= plane32.data_offset,
 	};
+	/*
+	 * timelm: the 4.19 QC compat layer copied reserved[] both ways.  The
+	 * 4.19 msm_vidc ABI passes the buffer fd, data offset, input tags and
+	 * compression ratio there, and the vendor codec HAL is 32-bit.
+	 */
+	BUILD_BUG_ON(sizeof(p64->reserved) != sizeof(plane32.reserved));
+	memcpy(p64->reserved, plane32.reserved, sizeof(p64->reserved));
 
 	return 0;
 }
@@ -375,6 +382,8 @@ static int put_v4l2_plane32(struct v4l2_plane *p64,
 		.length		= p64->length,
 		.data_offset	= p64->data_offset,
 	};
+	/* timelm: see get_v4l2_plane32() */
+	memcpy(plane32.reserved, p64->reserved, sizeof(plane32.reserved));
 
 	switch (memory) {
 	case V4L2_MEMORY_MMAP:
