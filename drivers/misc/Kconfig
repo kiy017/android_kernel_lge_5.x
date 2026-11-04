@@ -486,6 +486,18 @@ config QSEECOM_PROXY
 	 These callback functions can be used to start, shutdown and
 	 send commands to the trusted apps.
 
+config QSEECOM_QTI
+	bool "QTI QSEECOM driver (built-in /dev/qseecom)"
+	depends on ARCH_QCOM
+	help
+	 QTI Secure Execution Environment Communicator.  Provides the
+	 /dev/qseecom character device used by the vendor qseecomd and by
+	 the keymaster/keymint HALs to talk to the TrustZone apps.
+
+	 This is the driver from qcom/opensource/securemsm-kernel, pulled
+	 in-tree because devices without a vendor_boot/vendor_dlkm
+	 partition cannot load qseecom.ko as a module.
+
 config QPNP_MISC
 	tristate "QPNP Misc Peripheral"
 	depends on MFD_SPMI_PMIC
