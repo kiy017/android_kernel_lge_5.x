@@ -1,0 +1,17 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# timelm: QTI crypto engine /dev/qce (was timelm-bsp/build-qce.sh):
+# securemsm-kernel crypto-qti -> qce50_dlkm.ko + qcedev-mod_dlkm.ko, for
+# Widevine liboemcrypto.so -> libcpion.so (stock CRYPTO_DEV_QCEDEV=y).
+#
+# securemsm's Kbuild includes config/sec-kernel_defconfig*.conf, which would
+# also build tz_log/qcrypto/hdcp/qrng/qseecom_proxy/smcinvoke/qseecom.
+# Those confs assign with plain "=" inside the Makefile, so (unlike the old
+# command-line overrides) an export here cannot clear them; the conf lines
+# are commented out in securemsm-kernel/config instead.  qseecom and
+# smcinvoke are built in (drivers/misc/qseecom_qti).
+
+export SSG_MODULE_ROOT := $(realpath $(srctree)/$(src)/securemsm-kernel)
+export CONFIG_CRYPTO_DEV_QCEDEV := m
+
+obj-m += securemsm-kernel/

@@ -1306,7 +1306,7 @@ dt_binding_check: scripts_dtc
 
 
 ifeq ($(KBUILD_EXTMOD),)
-core-y			+= kernel/ certs/ mm/ fs/ ipc/ security/ crypto/
+core-y			+= kernel/ certs/ mm/ fs/ ipc/ security/ crypto/ techpack/
 core-$(CONFIG_BLOCK)	+= block/
 core-$(CONFIG_IO_URING)	+= io_uring/
 

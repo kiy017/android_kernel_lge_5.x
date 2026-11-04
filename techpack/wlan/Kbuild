@@ -1,0 +1,43 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# timelm: QCA6390 Wi-Fi (was timelm-bsp/build-wlan.sh).
+#   platform/: cnss2, cnss_utils, wlan_firmware_service, cnss_plat_ipc_qmi_svc,
+#              cnss_prealloc, cnss_nl
+#   qcacld-3.0/: wlan.ko (shipped as qca_cld3_qca6390.ko like stock).  With
+#              MODNAME=wlan and no DYNAMIC_SINGLE_CHIP the firmware/ini paths
+#              carry no chip prefix.  PANIC_ON_BUG/WLAN_WARN_ON_ASSERT are
+#              forced off (the qca6390 defconfig enables them on SLUB_DEBUG).
+# No CNSS_HW_SECURE_DISABLE/_SMEM (needs smcinvoke, not built), no CNSS_ASYNC
+# (synchronous probe so CNSS_PCI_PROBE_DONE is true before qcacld registers).
+#
+# The knobs are exported so both sub-trees see them; nothing in .config sets
+# them, so these values win exactly like the old command-line overrides.
+
+export WLAN_PLATFORM_ROOT := $(realpath $(srctree)/$(src)/platform)
+export WLAN_ROOT := $(realpath $(srctree)/$(src)/qcacld-3.0)
+export WLAN_COMMON_ROOT := cmn
+export WLAN_COMMON_INC := $(WLAN_ROOT)/cmn
+export WLAN_FW_API := $(realpath $(WLAN_ROOT)/../fw-api)
+export WLAN_PLATFORM_INC := $(WLAN_PLATFORM_ROOT)/inc
+
+export CONFIG_CNSS_OUT_OF_TREE := y
+export CONFIG_CNSS2 := m
+export CONFIG_CNSS2_QMI := y
+export CONFIG_CNSS_QMI_SVC := m
+export CONFIG_CNSS_PLAT_IPC_QMI_SVC := m
+export CONFIG_CNSS_GENL := m
+export CONFIG_WCNSS_MEM_PRE_ALLOC := m
+export CONFIG_CNSS_UTILS := m
+export CONFIG_BUS_AUTO_SUSPEND := y
+export CONFIG_CNSS_QCA6390 := y
+export CONFIG_QCA_CLD_WLAN := m
+
+export BOARD_PLATFORM := kona
+export WLAN_PROFILE := qca6390
+export MODNAME := wlan
+export PANIC_ON_BUG := n
+export WLAN_WARN_ON_ASSERT := n
+export DEVNAME := qca6390
+export WLAN_CTRL_NAME := wlan
+
+obj-m += platform/ qcacld-3.0/

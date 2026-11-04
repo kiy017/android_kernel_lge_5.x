@@ -1,0 +1,15 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# timelm: Qualcomm rmnet data driver (was timelm-bsp/build-data.sh).
+#   rmnet_core: the "rmnet" rtnl link type; the 4.19 vendor netmgrd creates
+#     the QMAP-muxed rmnet_dataN on rmnet_mhi0 (SDX55, MHI IP_HW0).
+#   RMNET_LL_MHI=y: low-latency backend over MHI (rmnet_ll_mhi.c), not IPA.
+#   RMNET_CTL_MHI=y: rmnet_ctl.ko over the MHI RMNET_CTL channels, needed by
+#     QMAP-mode DFC (kona is not an RMNET_LA_PLATFORM arch).
+#   RMNET_TRACE_INCLUDE_TIMELM: TRACE_INCLUDE_PATH for the trace headers.
+
+export RMNET_LL_MHI := y
+export RMNET_CTL_MHI := y
+subdir-ccflags-y += -DRMNET_TRACE_INCLUDE_TIMELM
+
+obj-m += core/

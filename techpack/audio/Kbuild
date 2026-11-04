@@ -1,0 +1,21 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# timelm: Elite (APR/q6) audio stack (was timelm-bsp/build-audio.sh), a
+# forward port of LG's 4.19 techpack/audio; the 5.15 audio-kernel is
+# AudioReach-only and can't talk to the kona ADSP firmware.
+#
+# MODNAME set = the techpack's DLKM mode (KERNEL_BUILD=0): every listed
+# subdir builds its own *_dlkm.ko from config/konaauto.conf +
+# konaautoconf.h and does not descend further.  One modpost pass resolves
+# the soc/dsp/ipc/asoc cross references, which the script needed 4 ordered
+# passes for.  The boot image ships them with the stock names
+# (apr_dlkm.ko -> audio_apr.ko).
+
+export AUDIO_ROOT := $(realpath $(srctree)/$(src)/audio-kernel-elite)
+export MODNAME := audio
+
+AUD := audio-kernel-elite
+obj-m += $(AUD)/soc/ $(AUD)/dsp/ $(AUD)/ipc/ $(AUD)/asoc/
+obj-m += $(AUD)/asoc/codecs/ $(AUD)/asoc/codecs/bolero/
+obj-m += $(AUD)/asoc/codecs/wcd938x/ $(AUD)/asoc/codecs/wsa883x/
+obj-m += $(AUD)/asoc/codecs/tfa9878/
