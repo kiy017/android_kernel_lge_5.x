@@ -1,0 +1,47 @@
+/dts-v1/;
+
+/* LG V60 ThinQ 5G (timelm) — Qualcomm downstream kona v2.1 (SM8250)
+ *
+ * Combined board DTB: the LG bootloader (LK) matches this DTB's
+ * qcom,msm-id / qcom,board-id against the device CDT when the dtbo
+ * partition is empty, so it is self-contained.
+ */
+
+#include "kona-v2.1.dtsi"
+#include "kona-timelm-common.dtsi"
+#include "kona-sde-display.dtsi"
+/*
+ * Adreno 650 / KGSL.  The generic kona-v2.1.dtsi leaves
+ * qcom,kgsl-3d0@3d00000 as an empty stub (only #cooling-cells), which is
+ * enough for the thermal zones but not for the GPU driver.  The 5.15
+ * graphics-kernel expects the full node, which is provided by the
+ * GPU dtsi in this tree; kona-v2.1-gpu.dtsi additionally sets
+ * qcom,chipid = <0x06050002>, matching the live V60 DT.
+ */
+#include "graphics/gpu/kona-v2.1-gpu.dtsi"
+/*
+ * Camera (Spectra 480): QC 4.19 SoC nodes for the 4.19 camera driver port
+ * (camera.ko from camera-kernel-lge).  Sensors/actuators/OIS/flash
+ * (LG kona-timelm-camera_revb) come in a later stage.
+ */
+#include "camera/kona-camera-lge.dtsi"
+/* LG camera modules (sensors, actuators, OIS, eeproms, flash, lrmc) */
+#include "kona-timelm-camera.dtsi"
+/* Egis ET713 fingerprint (LG kona-timelm_common-fingerprint.dtsi) */
+#include "kona-timelm-fingerprint.dtsi"
+/* Sony CXD2252 NFC (stock cxd22xx-i2c@28 on qupv3_se1_i2c) */
+#include "kona-timelm-nfc.dtsi"
+#include "video/kona-vidc-lge.dtsi"
+#include "video/kona-cvp-lge.dtsi"
+/* Board thermistors (skin/quiet/QTM) + HAL-facing thermal zones */
+#include "kona-timelm-thermal.dtsi"
+
+/ {
+	model = "LG V60 ThinQ 5G (timelm)";
+	compatible = "qcom,kona", "lg,timelm";
+
+	qcom,board-id = <0x03000008 0>, <0x030C0008 0>, <0x03060008 0>,
+			<0x03070008 0>, <0x03070108 0>, <0x03070208 0>,
+			<0x03080008 0>;
+	qcom,msm-id = <356 0x20001>;
+};

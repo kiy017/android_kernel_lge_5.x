@@ -28,7 +28,29 @@
 	ddr-regions { };
 
 	chosen {
-		bootargs = "console=ttyMSM0,115200n8 loglevel=6 kpti=0 log_buf_len=256K kernel.panic_on_rcu_stall=1 rcupdate.rcu_expedited=1 rcu_nocbs=0-7 ftrace_dump_on_oops fw_devlink.strict=1 cpufreq.default_governor=performance printk.console_no_auto_verbose=1 kasan=off pcie_ports=compat qcom_dma_heaps.enable_bitstream_contig_heap=y";
+		/*
+		 * Kept *non-empty* on purpose: LG's LK appends its own arguments
+		 * (and the boot image cmdline) after whatever is in
+		 * /chosen/bootargs, and an empty/absent property is not a path
+		 * this firmware is known to handle (the img28 build with an
+		 * empty node produced no ramoops output at all).
+		 *
+		 * The value is deliberately tiny.  The kernel concatenates this
+		 * string with CONFIG_CMDLINE and truncates the result at
+		 * COMMAND_LINE_SIZE (2048 bytes), and LG puts the device
+		 * specific parameters (serialno, baseband, verifiedbootstate,
+		 * keymaster, msm_drm.dsi_display0, ...) at the *end* of its own
+		 * list.  Every byte spent here is taken off that end, so this
+		 * keeps only what we actually want from it: loglevel=7, which
+		 * also wins over any other loglevel because it comes last.
+		 *
+		 * Everything else we must have is repeated in CONFIG_CMDLINE,
+		 * which drivers/of/fdt.c prepends and can never be truncated.
+		 * The old vendor debug string (kpti, rcu_nocbs, ftrace_dump_on_oops,
+		 * fw_devlink.strict, cpufreq.default_governor, pcie_ports,
+		 * log_buf_len, qcom_dma_heaps...) is intentionally dropped.
+		 */
+		bootargs = "loglevel=7";
 	};
 
 	reserved_memory: reserved-memory { };
@@ -963,7 +985,7 @@
 			compatible = "fixed-clock";
 			clock-frequency = <32000>;
 			clock-output-names = "sleep_clk";
-			#clock-cells = <1>;
+			#clock-cells = <0>;
 		};
 
 		usb3_phy_wrapper_gcc_usb30_pipe_clk: usb3-phy-wrapper-gcc-usb30-pipe-clk {

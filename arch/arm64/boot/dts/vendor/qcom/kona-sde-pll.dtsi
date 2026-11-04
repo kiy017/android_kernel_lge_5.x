@@ -1,0 +1,54 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * Kona (SM8250) standalone MDSS 7nm DSI PLL nodes for the msm-5.15
+ * display techpack.
+ *
+ * The 5.15 BSP models the DSI PLL as "integrated" into the DSI PHY node
+ * (pll-label / pll_base), but no 7nm variant of that integrated driver
+ * exists.  Kona instead uses a standalone PLL block, so we bind the 7nm
+ * PLL driver ported from the 4.19 LG kona tree.  That driver registers
+ * both the dispcc parent clocks (dsi{0,1}_phy_pll_out_byteclk / _dsiclk)
+ * and the mux clocks the DSI display selects via "pll_byte_clk0" /
+ * "pll_dsi_clk0".
+ */
+
+#include <dt-bindings/clock/qcom,dispcc-sm8250.h>
+
+&soc {
+	mdss_dsi0_pll: qcom,mdss_dsi_pll@ae94900 {
+		compatible = "qcom,mdss_dsi_pll_7nm_v4_1";
+		label = "MDSS DSI 0 PLL";
+		cell-index = <0>;
+		#clock-cells = <1>;
+		reg = <0xae94900 0x260>,
+		      <0xae94400 0x800>,
+		      <0xaf03000 0x8>,
+		      <0xae94200 0x100>;
+		reg-names = "pll_base", "phy_base", "gdsc_base",
+				"dynamic_pll_base";
+		clocks = <&dispcc DISP_CC_MDSS_AHB_CLK>;
+		clock-names = "iface_clk";
+		clock-rate = <0>;
+		memory-region = <&dfps_data_memory>;
+		qcom,dsi-pll-ssc-en;
+		qcom,dsi-pll-ssc-mode = "down-spread";
+	};
+
+	mdss_dsi1_pll: qcom,mdss_dsi_pll@ae96900 {
+		compatible = "qcom,mdss_dsi_pll_7nm_v4_1";
+		label = "MDSS DSI 1 PLL";
+		cell-index = <1>;
+		#clock-cells = <1>;
+		reg = <0xae96900 0x260>,
+		      <0xae96400 0x800>,
+		      <0xaf03000 0x8>,
+		      <0xae96200 0x100>;
+		reg-names = "pll_base", "phy_base", "gdsc_base",
+				"dynamic_pll_base";
+		clocks = <&dispcc DISP_CC_MDSS_AHB_CLK>;
+		clock-names = "iface_clk";
+		clock-rate = <0>;
+		qcom,dsi-pll-ssc-en;
+		qcom,dsi-pll-ssc-mode = "down-spread";
+	};
+};
