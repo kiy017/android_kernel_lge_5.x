@@ -718,6 +718,18 @@ static ssize_t devkmsg_write(struct kiocb *iocb, struct iov_iter *from)
 		}
 	}
 
+	/*
+	 * timelm bring-up: logd's libbase HexToBytes() failure loop writes ~340
+	 * lines/s into /dev/kmsg and evicts the whole boot log from the 256 KB
+	 * ramoops console ring (img31 retained only 98.1 s - 109.1 s of a boot
+	 * that lived for minutes).  Drop just that message so a full boot fits
+	 * in the ring again.  Remove with the TIMELMTRACE hooks.
+	 */
+	if (strstr(line, "HexToBytes:")) {
+		kfree(buf);
+		return ret;
+	}
+
 	devkmsg_emit(facility, level, "%s", line);
 	kfree(buf);
 	return ret;
