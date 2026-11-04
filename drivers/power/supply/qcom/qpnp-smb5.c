@@ -230,7 +230,8 @@ struct smb5 {
 	struct iio_chan_spec	*iio_chan_ids;
 };
 
-static int __debug_mask;
+/* TIMELMCHG: log plug-in/APSD/type-c events from boot (default 0) */
+static int __debug_mask = PR_INTERRUPT | PR_MISC;
 
 static ssize_t pd_disabled_show(struct device *dev, struct device_attribute
 				*attr, char *buf)
