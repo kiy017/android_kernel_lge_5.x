@@ -2897,6 +2897,14 @@ int soc_new_pcm(struct snd_soc_pcm_runtime *rtd, int num)
 	pcm->nonatomic = rtd->dai_link->nonatomic;
 	pcm->private_data = rtd;
 
+	/* timelm: QC 4.19 - mark hostless PCMs (no host IO is performed) */
+	if (rtd->dai_link->no_host_mode == SND_SOC_DAI_LINK_NO_HOST) {
+		if (playback)
+			pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream->hw_no_buffer = 1;
+		if (capture)
+			pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream->hw_no_buffer = 1;
+	}
+
 	if (rtd->dai_link->no_pcm || rtd->dai_link->params) {
 		if (playback)
 			pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream->private_data = rtd;

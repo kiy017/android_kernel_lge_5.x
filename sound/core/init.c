@@ -323,6 +323,7 @@ static int snd_card_init(struct snd_card *card, struct device *parent,
 	atomic_set(&card->power_ref, 0);
 #endif
 	init_waitqueue_head(&card->remove_sleep);
+	init_waitqueue_head(&card->offline_poll_wait);	/* timelm: QC card state */
 	card->sync_irq = -1;
 
 	device_initialize(&card->card_dev);
@@ -1137,6 +1138,30 @@ int snd_card_file_remove(struct snd_card *card, struct file *file)
 	return 0;
 }
 EXPORT_SYMBOL(snd_card_file_remove);
+
+/*
+ * timelm: QC 4.19 card online/offline state.  The vendor audio HAL's sound
+ * card monitor (libsndmonitor) reads/polls /proc/asound/cardN/state for
+ * ONLINE/OFFLINE across ADSP SSR; the Elite machine driver drives it via
+ * snd_soc_card_change_online_state().
+ */
+void snd_card_change_online_state(struct snd_card *card, int online)
+{
+	dev_dbg(card->dev, "snd card %s state change %d -> %d\n",
+		card->shortname, !card->offline, online);
+	card->offline = !online;
+	/* make sure offline is updated prior to wake up */
+	wmb();
+	xchg(&card->offline_change, 1);
+	wake_up_interruptible(&card->offline_poll_wait);
+}
+EXPORT_SYMBOL(snd_card_change_online_state);
+
+bool snd_card_is_online_state(struct snd_card *card)
+{
+	return !card->offline;
+}
+EXPORT_SYMBOL(snd_card_is_online_state);
 
 #ifdef CONFIG_PM
 /**

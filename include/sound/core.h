@@ -132,6 +132,10 @@ struct snd_card {
 	bool releasing;			/* during card free process */
 	int sync_irq;			/* assigned irq, used for PCM sync */
 	wait_queue_head_t remove_sleep;
+	/* timelm: QC 4.19 card online/offline state (/proc/asound/cardN/state) */
+	int offline;			/* if this sound card is offline */
+	unsigned long offline_change;
+	wait_queue_head_t offline_poll_wait;
 
 	size_t total_pcm_alloc_bytes;	/* total amount of allocated buffers */
 	struct mutex memory_mutex;	/* protection for the above */
@@ -298,6 +302,9 @@ int snd_devm_card_new(struct device *parent, int idx, const char *xid,
 
 int snd_card_disconnect(struct snd_card *card);
 void snd_card_disconnect_sync(struct snd_card *card);
+/* timelm: QC 4.19 card online/offline state (audio HAL sound card monitor) */
+void snd_card_change_online_state(struct snd_card *card, int online);
+bool snd_card_is_online_state(struct snd_card *card);
 int snd_card_free(struct snd_card *card);
 int snd_card_free_when_closed(struct snd_card *card);
 int snd_card_free_on_error(struct device *dev, int ret);

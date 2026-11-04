@@ -597,6 +597,7 @@ struct snd_soc_pcm_stream {
 	unsigned int channels_min;	/* min channels */
 	unsigned int channels_max;	/* max channels */
 	unsigned int sig_bits;		/* number of bits of content */
+	const char *aif_name;		/* timelm: QC 4.19, DAPM AIF widget name (driver data) */
 	ANDROID_VENDOR_DATA(1);
 };
 
@@ -626,6 +627,9 @@ struct snd_soc_dai_link_component {
 	struct device_node *of_node;
 	const char *dai_name;
 };
+
+/* timelm: QC 4.19 snd_soc_dai_link.no_host_mode value */
+#define SND_SOC_DAI_LINK_NO_HOST		0x1
 
 struct snd_soc_dai_link {
 	/* config - must be set by machine driver */
@@ -720,6 +724,9 @@ struct snd_soc_dai_link {
 
 	/* pmdown_time is ignored at stop */
 	unsigned int ignore_pmdown_time:1;
+
+	/* timelm: QC 4.19 hostless link (voice/loopback FEs), SND_SOC_DAI_LINK_NO_HOST */
+	unsigned int no_host_mode:2;
 
 	/* Do not create a PCM for this DAI link (Backend link) */
 	unsigned int ignore:1;
@@ -1327,6 +1334,10 @@ struct snd_soc_dai *devm_snd_soc_register_dai(struct device *dev,
 					      bool legacy_dai_naming);
 void snd_soc_unregister_dai(struct snd_soc_dai *dai);
 
+/* timelm: QC 4.19 exports for the Elite audio-kernel */
+struct snd_soc_component *soc_find_component_locked(
+	const struct device_node *of_node, const char *name);
+void snd_soc_card_change_online_state(struct snd_soc_card *soc_card, int online);
 struct snd_soc_dai *snd_soc_find_dai(
 	const struct snd_soc_dai_link_component *dlc);
 struct snd_soc_dai *snd_soc_find_dai_with_mutex(

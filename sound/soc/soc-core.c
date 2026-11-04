@@ -796,6 +796,30 @@ static struct snd_soc_component *soc_find_component(
 	return NULL;
 }
 
+/*
+ * timelm: QC 4.19 export used by the Elite machine driver (kona.c) to wait
+ * for / fetch WSA and WCD components by of_node or name.
+ */
+struct snd_soc_component *soc_find_component_locked(
+	const struct device_node *of_node, const char *name)
+{
+	struct snd_soc_dai_link_component dlc = {
+		.of_node = (struct device_node *)of_node,
+		.name = name,
+	};
+	struct snd_soc_component *component;
+
+	/* 4.19 semantics: nothing to match on -> not found (5.15 would match any) */
+	if (!of_node && !name)
+		return NULL;
+
+	mutex_lock(&client_mutex);
+	component = soc_find_component(&dlc);
+	mutex_unlock(&client_mutex);
+	return component;
+}
+EXPORT_SYMBOL(soc_find_component_locked);
+
 /**
  * snd_soc_find_dai - Find a registered DAI
  *
@@ -2738,6 +2762,14 @@ void snd_soc_unregister_component(struct device *dev)
 	mutex_unlock(&client_mutex);
 }
 EXPORT_SYMBOL_GPL(snd_soc_unregister_component);
+
+/* timelm: QC 4.19, mark a soc card online/offline (ADSP SSR) */
+void snd_soc_card_change_online_state(struct snd_soc_card *soc_card, int online)
+{
+	if (soc_card && soc_card->snd_card)
+		snd_card_change_online_state(soc_card->snd_card, online);
+}
+EXPORT_SYMBOL(snd_soc_card_change_online_state);
 
 /* Retrieve a card's name from device tree */
 int snd_soc_of_parse_card_name(struct snd_soc_card *card,

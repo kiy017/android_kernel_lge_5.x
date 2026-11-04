@@ -818,6 +818,19 @@ static void free_chmap(struct snd_pcm_str *pstr)
 		up_write(&card->controls_rwsem);
 		pstr->chmap_kctl = NULL;
 	}
+	/* timelm: QC 4.19 per-PCM controls */
+	if (pstr->vol_kctl || pstr->usr_kctl) {
+		struct snd_card *card = pstr->pcm->card;
+
+		down_write(&card->controls_rwsem);
+		if (pstr->vol_kctl)
+			snd_ctl_remove(card, pstr->vol_kctl);
+		if (pstr->usr_kctl)
+			snd_ctl_remove(card, pstr->usr_kctl);
+		up_write(&card->controls_rwsem);
+		pstr->vol_kctl = NULL;
+		pstr->usr_kctl = NULL;
+	}
 }
 
 static void snd_pcm_free_stream(struct snd_pcm_str * pstr)
