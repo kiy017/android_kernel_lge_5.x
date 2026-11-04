@@ -485,6 +485,8 @@ struct snd_pcm_substream {
 #endif /* CONFIG_SND_VERBOSE_PROCFS */
 	/* misc flags */
 	unsigned int hw_opened: 1;
+	/* timelm: QC 4.19 hostless PCM (no host buffer), see soc_new_pcm() */
+	unsigned int hw_no_buffer: 1;
 	unsigned int managed_buffer_alloc:1;
 	ANDROID_VENDOR_DATA(1);
 	ANDROID_KABI_RESERVE(1);
@@ -511,6 +513,9 @@ struct snd_pcm_str {
 #endif
 #endif
 	struct snd_kcontrol *chmap_kctl; /* channel-mapping controls */
+	/* timelm: QC 4.19 per-PCM controls (Elite audio-kernel) */
+	struct snd_kcontrol *vol_kctl; /* volume controls */
+	struct snd_kcontrol *usr_kctl; /* user controls */
 	struct device dev;
 	ANDROID_KABI_RESERVE(1);
 };
@@ -1463,6 +1468,48 @@ int snd_pcm_add_chmap_ctls(struct snd_pcm *pcm, int stream,
 			   int max_channels,
 			   unsigned long private_value,
 			   struct snd_pcm_chmap **info_ret);
+
+/*
+ * timelm: QC 4.19 PCM volume/user control API, needed by the Elite
+ * audio-kernel (msm-pcm-loopback-v2, msm-lsm-client, msm-pcm-q6-v2).
+ */
+struct snd_pcm_volume_elem {
+	int volume;
+};
+
+struct snd_pcm_volume {
+	struct snd_pcm *pcm;	/* assigned PCM instance */
+	int stream;		/* PLAYBACK or CAPTURE */
+	struct snd_kcontrol *kctl;
+	const struct snd_pcm_volume_elem *volume;
+	int max_length;
+	void *private_data;	/* optional: private data pointer */
+};
+
+int snd_pcm_add_volume_ctls(struct snd_pcm *pcm, int stream,
+			   const struct snd_pcm_volume_elem *volume,
+			   int max_length,
+			   unsigned long private_value,
+			   struct snd_pcm_volume **info_ret);
+
+struct snd_pcm_usr_elem {
+	int val[128];
+};
+
+struct snd_pcm_usr {
+	struct snd_pcm *pcm;	/* assigned PCM instance */
+	int stream;		/* PLAYBACK or CAPTURE */
+	struct snd_kcontrol *kctl;
+	const struct snd_pcm_usr_elem *usr;
+	int max_length;
+	void *private_data;	/* optional: private data pointer */
+};
+
+int snd_pcm_add_usr_ctls(struct snd_pcm *pcm, int stream,
+			 const struct snd_pcm_usr_elem *usr,
+			 int max_length, int max_control_str_len,
+			 unsigned long private_value,
+			 struct snd_pcm_usr **info_ret);
 
 /**
  * pcm_format_to_bits - Strong-typed conversion of pcm_format to bitwise

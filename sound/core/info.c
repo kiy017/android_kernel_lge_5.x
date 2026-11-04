@@ -494,6 +494,42 @@ static void snd_card_id_read(struct snd_info_entry *entry,
 	snd_iprintf(buffer, "%s\n", card->id);
 }
 
+/* timelm: QC 4.19 /proc/asound/cardN/state ("ONLINE"/"OFFLINE", pollable) */
+#define SND_CARD_STATE_MAX_LEN 16
+
+static ssize_t snd_card_state_read(struct snd_info_entry *entry,
+				   void *file_private_data, struct file *file,
+				   char __user *buf, size_t count, loff_t pos)
+{
+	struct snd_card *card = entry->private_data;
+	int len;
+	char buffer[SND_CARD_STATE_MAX_LEN];
+
+	/* make sure offline is updated prior to wake up */
+	rmb();
+
+	len = snprintf(buffer, sizeof(buffer), "%s\n",
+		       card->offline ? "OFFLINE" : "ONLINE");
+	return simple_read_from_buffer(buf, count, &pos, buffer, len);
+}
+
+static __poll_t snd_card_state_poll(struct snd_info_entry *entry,
+				    void *private_data, struct file *file,
+				    poll_table *wait)
+{
+	struct snd_card *card = entry->private_data;
+
+	poll_wait(file, &card->offline_poll_wait, wait);
+	if (xchg(&card->offline_change, 0))
+		return EPOLLIN | EPOLLPRI | EPOLLRDNORM;
+	return 0;
+}
+
+static const struct snd_info_entry_ops snd_card_state_proc_ops = {
+	.read = snd_card_state_read,
+	.poll = snd_card_state_poll,
+};
+
 /*
  * create a card proc file
  * called from init.c
@@ -502,6 +538,7 @@ int snd_info_card_create(struct snd_card *card)
 {
 	char str[8];
 	struct snd_info_entry *entry;
+	int err;
 
 	if (snd_BUG_ON(!card))
 		return -ENXIO;
@@ -512,7 +549,19 @@ int snd_info_card_create(struct snd_card *card)
 		return -ENOMEM;
 	card->proc_root = entry;
 
-	return snd_card_ro_proc_new(card, "id", card, snd_card_id_read);
+	err = snd_card_ro_proc_new(card, "id", card, snd_card_id_read);
+	if (err < 0)
+		return err;
+
+	/* timelm: QC 4.19 card state file */
+	entry = snd_info_create_card_entry(card, "state", card->proc_root);
+	if (!entry)
+		return -ENOMEM;
+	entry->private_data = card;
+	entry->size = SND_CARD_STATE_MAX_LEN;
+	entry->content = SNDRV_INFO_CONTENT_DATA;
+	entry->c.ops = &snd_card_state_proc_ops;
+	return 0;
 }
 
 /*
