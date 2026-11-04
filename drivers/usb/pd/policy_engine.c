@@ -450,6 +450,7 @@ struct usbpd {
 	enum data_role		current_dr;
 	enum power_role		current_pr;
 	bool			in_pr_swap;
+	bool			timelm_pe_deferred;
 	bool			pd_phy_opened;
 	bool			send_request;
 	struct completion	is_ready;
@@ -3781,6 +3782,7 @@ static void psy_changed_notifier_work(struct work_struct *w)
 			usbpd_dbg(&pd->dev, "typec mode:%d type:%d\n",
 				typec_mode, val.intval);
 			pd->typec_mode = typec_mode;
+			pd->timelm_pe_deferred = true;
 			queue_work(pd->wq, &pd->start_periph_work);
 		}
 
@@ -3816,9 +3818,20 @@ static void psy_changed_notifier_work(struct work_struct *w)
 		return;
 	}
 
-	if (pd->typec_mode == typec_mode)
+	if (pd->typec_mode == typec_mode) {
+		/*
+		 * timelm: smb5 retried ok_to_pd (PE_START went 0 -> 1) on the
+		 * attach that already started USB directly, so typec_mode won't
+		 * change again.  4.19 LG kicked the state machine here too.
+		 */
+		if (pd->timelm_pe_deferred && !pd->pd_connected) {
+			pd->timelm_pe_deferred = false;
+			kick_sm(pd, 0);
+		}
 		return;
+	}
 
+	pd->timelm_pe_deferred = false;
 	pd->typec_mode = typec_mode;
 
 	usbpd_dbg(&pd->dev, "typec mode:%d present:%d orientation:%d\n",
