@@ -1177,6 +1177,18 @@ static int adsp_probe(struct platform_device *pdev)
 	}
 
 	rproc->recovery_disabled = true;
+	/*
+	 * timelm: the 4.19-era vendor init enables SSR through
+	 * /sys/bus/msm_subsys (absent on 5.15), so a crashed SLPI stays down
+	 * and every sensor activate blocks the sensors HAL for 8 s (screen
+	 * wake hangs in system_server).  Let the DT opt a remote into
+	 * recovery; there is no ramdump collector, so skip the coredump.
+	 */
+	if (of_property_read_bool(pdev->dev.of_node, "qcom,timelm-recovery")) {
+		rproc->recovery_disabled = false;
+		rproc->dump_conf = RPROC_COREDUMP_DISABLED;
+		dev_info(&pdev->dev, "timelm: recovery enabled, coredump off\n");
+	}
 	rproc->auto_boot = desc->auto_boot;
 	if (desc->uses_elf64)
 		rproc_coredump_set_elf_info(rproc, ELFCLASS64, EM_NONE);

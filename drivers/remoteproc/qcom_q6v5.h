@@ -46,6 +46,7 @@ struct qcom_q6v5 {
 	int crash_reason;
 
 	bool running;
+	bool no_panic_on_crash;
 
 	void (*handover)(struct qcom_q6v5 *q6v5);
 	unsigned long long seq;
