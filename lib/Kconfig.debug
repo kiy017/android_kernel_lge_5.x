@@ -602,6 +602,14 @@ source "lib/Kconfig.kgdb"
 source "lib/Kconfig.ubsan"
 source "lib/Kconfig.kcsan"
 
+config TIMELM_TRACE
+	bool "timelm: trace vendor TEE daemon syscalls (TIMELMTRACE/SYSRET)"
+	help
+	  Bring-up tracing for qseecomd, keymaster and the TEE HALs: failed
+	  syscalls, open/ioctl/connect and the first bytes of their liblog
+	  writes, logged to the kernel log.  Floods the log; off unless
+	  chasing vendor TEE userspace.  See include/linux/timelm_trace.h.
+
 endmenu
 
 config DEBUG_KERNEL

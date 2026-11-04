@@ -26,6 +26,7 @@
 #include "internal.h"
 
 #include <asm/ioctls.h>
+#include <linux/timelm_trace.h>
 
 /* So that the fiemap access checks can't overflow on 32 bit machines. */
 #define FIEMAP_MAX_EXTENTS	(UINT_MAX / sizeof(struct fiemap_extent))
@@ -865,6 +866,9 @@ SYSCALL_DEFINE3(ioctl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
 	if (!f.file)
 		return -EBADF;
 
+	if (timelm_trace_comm())
+		pr_info("TIMELMTRACE: %s ioctl cmd=0x%x fd=%u\n",
+			current->comm, cmd, fd);
 	error = security_file_ioctl(f.file, cmd, arg);
 	if (error)
 		goto out;
@@ -874,6 +878,9 @@ SYSCALL_DEFINE3(ioctl, unsigned int, fd, unsigned int, cmd, unsigned long, arg)
 		error = vfs_ioctl(f.file, cmd, arg);
 
 out:
+	if (timelm_trace_comm())
+		pr_info("TIMELMTRACE: %s ioctl cmd=0x%x -> %d\n",
+			current->comm, cmd, error);
 	fdput(f);
 	return error;
 }
