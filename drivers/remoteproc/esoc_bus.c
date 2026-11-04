@@ -7,6 +7,7 @@
 #include <linux/idr.h>
 #include <linux/slab.h>
 #include "esoc.h"
+#include <linux/timelm_subsys_compat.h>
 
 static DEFINE_IDA(esoc_ida);
 
@@ -227,6 +228,14 @@ int esoc_clink_register_rproc(struct esoc_clink *esoc_clink)
 		dev_err(&esoc_clink->dev, "unable to add remoteproc\n");
 		goto remove_subdev;
 	}
+
+	/*
+	 * timelm: /sys/bus/msm_subsys + /dev/subsys_esocN for the 4.19 vendor
+	 * pm-service (4.19 named this subsystem "esoc%d" as well).
+	 */
+	ret = timelm_subsys_compat_add(esoc_clink->rproc, rproc_name);
+	if (ret)
+		dev_err(&esoc_clink->dev, "timelm subsys compat failed: %d\n", ret);
 
 	return 0;
 
