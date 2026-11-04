@@ -16,6 +16,8 @@
 #include <asm/thread_info.h>
 #include <asm/unistd.h>
 
+#include <linux/timelm_trace.h>
+
 long compat_arm_syscall(struct pt_regs *regs, int scno);
 long sys_ni_syscall(void);
 
@@ -43,8 +45,14 @@ static void invoke_syscall(struct pt_regs *regs, unsigned int scno,
 			   const syscall_fn_t syscall_table[])
 {
 	long ret;
+	unsigned long a0, a1, a2;
 
 	add_random_kstack_offset();
+
+	/* TMPDBG: syscall_set_return_value() clobbers regs->regs[0] */
+	a0 = regs->regs[0];
+	a1 = regs->regs[1];
+	a2 = regs->regs[2];
 
 	if (scno < sc_nr) {
 		syscall_fn_t syscall_fn;
@@ -55,6 +63,9 @@ static void invoke_syscall(struct pt_regs *regs, unsigned int scno,
 	}
 
 	syscall_set_return_value(current, regs, 0, ret);
+
+	if (ret < 0)
+		timelm_trace_failed_syscall(scno, a0, a1, a2, ret);
 
 	/*
 	 * Ultimately, this value will get limited by KSTACK_OFFSET_MAX(),
