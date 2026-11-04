@@ -449,6 +449,16 @@ static void mhi_sat_process_cmds(struct mhi_sat_cntrl *sat_cntrl,
 			buf->phys_addr = MHI_TRE_GET_PTR(pkt);
 			buf->len = MHI_TRE_GET_SIZE(pkt);
 			buf->is_io = MHI_TRE_IS_IO_ADDR_TYPE(pkt);
+			/*
+			 * timelm: the kona ADSP firmware (4.19 satellite
+			 * protocol) never sets the IO-address bit, but its rings
+			 * live in its no-map carveout: phys_to_virt() of that is
+			 * garbage, dma_map_single_attrs() then maps the wrong
+			 * pages and the SDX55 faults on the iova (img80 SMMU
+			 * fault, img81 modem errfatal).  4.19 always used
+			 * dma_map_resource(); do the same.
+			 */
+			buf->is_io = true;
 
 			if (buf->is_io) {
 				iova = dma_map_resource(parent_dev,
@@ -1162,6 +1172,11 @@ static const struct mhi_device_id mhi_sat_dev_match_table[] = {
 	{ .chan = "ADSP_1", .driver_data = SUBSYS_ADSP },
 	{ .chan = "ADSP_2", .driver_data = SUBSYS_ADSP },
 	{ .chan = "ADSP_3", .driver_data = SUBSYS_ADSP },
+	/* timelm: 4.19 also matched SLPI_x; the kona SLPI opens mhi_sat too */
+	{ .chan = "SLPI_0", .driver_data = SUBSYS_SLPI },
+	{ .chan = "SLPI_1", .driver_data = SUBSYS_SLPI },
+	{ .chan = "SLPI_2", .driver_data = SUBSYS_SLPI },
+	{ .chan = "SLPI_3", .driver_data = SUBSYS_SLPI },
 	{},
 };
 

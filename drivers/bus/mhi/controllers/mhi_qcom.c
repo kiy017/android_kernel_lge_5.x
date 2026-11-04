@@ -310,6 +310,209 @@ static const struct mhi_controller_config qcom_lemans_mhi_config = {
 	.event_cfg = qcom_lemans_mhi_events,
 };
 
+/*
+ * timelm: SDX55 (0x0306) on the LG V60 PCIe RC2, stock-exact (img83).
+ * Channels, event rings and ring indices as in the stock 4.19 DT (mhi_0
+ * under pcie2_rp; tmp/stock-mhi0.txt).  img80-82 showed that the SDX55
+ * MPSS stops after its first 10 QMI services once the ADSP satellite is
+ * up with a non-stock layout (ADSP ring 10, no SLPI_x), so nothing is
+ * renumbered here: ADSP ring 4, SLPI ring 5, BW scale 6, HW rings
+ * 7/8/9/10, MHI-prime 11-14, RMNET_CTL 15/16; MSI vectors as stock
+ * (offload rings and the BW scale ring on vector 0).
+ * 5.15 parse_ch_cfg() needs num_elements > 0 even for offload channels
+ * (img77), so those get 1.  17 rings -> 18 MSI, the SDX55 offers 32.
+ */
+#define TIMELM_OFFLOAD_CHAN(n, nm, d, er) \
+	{ .dir = d, .num = n, .name = nm, .num_elements = 1, \
+	  .event_ring = er, .ee_mask = BIT(MHI_EE_AMSS), \
+	  .offload_channel = true, }
+
+static const struct mhi_channel_config modem_qcom_sdx55_mhi_channels[] = {
+	/* SBL channels */
+	MHI_CHANNEL_CONFIG_UL(2, "SAHARA", 128, 1, MHI_EE_SBL,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
+	MHI_CHANNEL_CONFIG_DL(3, "SAHARA", 128, 1, MHI_EE_SBL,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, false, 0, 0),
+	MHI_CHANNEL_CONFIG_DL(25, "BL", 32, 1, MHI_EE_SBL,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, false, 0, 0),
+	/* AMSS channels */
+	MHI_CHANNEL_CONFIG_UL(0, "LOOPBACK", 64, 2, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
+	MHI_CHANNEL_CONFIG_DL(1, "LOOPBACK", 64, 2, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, false, 0, 0),
+	MHI_CHANNEL_CONFIG_UL(4, "DIAG", 64, 1, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
+	MHI_CHANNEL_CONFIG_DL(5, "DIAG", 64, 3, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, false, 0, 0),
+	MHI_CHANNEL_CONFIG_UL(8, "QDSS", 64, 1, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
+	MHI_CHANNEL_CONFIG_DL(9, "QDSS", 128, 1, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, false, 0, 0),
+	MHI_CHANNEL_CONFIG_UL(10, "EFS", 64, 1, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
+	/* wake-capable */
+	MHI_CHANNEL_CONFIG_DL(11, "EFS", 64, 1, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      true, false, 0, 0),
+	MHI_CHANNEL_CONFIG_UL(14, "QMI0", 64, 1, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
+	MHI_CHANNEL_CONFIG_DL(15, "QMI0", 64, 2, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, false, 0, 0),
+	MHI_CHANNEL_CONFIG_UL(16, "QMI1", 64, 3, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
+	MHI_CHANNEL_CONFIG_DL(17, "QMI1", 64, 3, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, false, 0, 0),
+	MHI_CHANNEL_CONFIG_UL(18, "IP_CTRL", 64, 1, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
+	/* auto-queue */
+	MHI_CHANNEL_CONFIG_DL(19, "IP_CTRL", 64, 1, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, true, 0, 0),
+	MHI_CHANNEL_CONFIG_UL(20, "IPCR", 64, 2, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
+	/* auto-queue */
+	MHI_CHANNEL_CONFIG_DL(21, "IPCR", 64, 2, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, true, 0, 0),
+	MHI_CHANNEL_CONFIG_UL(22, "TF", 64, 2, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
+	MHI_CHANNEL_CONFIG_DL(23, "TF", 64, 2, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, false, 0, 0),
+	MHI_CHANNEL_CONFIG_UL(26, "DCI", 64, 3, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
+	MHI_CHANNEL_CONFIG_DL(27, "DCI", 64, 3, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, false, 0, 0),
+	MHI_CHANNEL_CONFIG_UL(32, "DUN", 64, 3, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
+	MHI_CHANNEL_CONFIG_DL(33, "DUN", 64, 3, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, false, 0, 0),
+	/* ADSP / SLPI satellite channels (mhi_satellite), stock rings 4 / 5 */
+	TIMELM_OFFLOAD_CHAN(50, "ADSP_0", DMA_BIDIRECTIONAL, 4),
+	TIMELM_OFFLOAD_CHAN(51, "ADSP_1", DMA_BIDIRECTIONAL, 4),
+	TIMELM_OFFLOAD_CHAN(52, "SLPI_0", DMA_BIDIRECTIONAL, 5),
+	TIMELM_OFFLOAD_CHAN(53, "SLPI_1", DMA_BIDIRECTIONAL, 5),
+	TIMELM_OFFLOAD_CHAN(70, "ADSP_2", DMA_BIDIRECTIONAL, 4),
+	TIMELM_OFFLOAD_CHAN(71, "ADSP_3", DMA_BIDIRECTIONAL, 4),
+	TIMELM_OFFLOAD_CHAN(72, "SLPI_2", DMA_BIDIRECTIONAL, 5),
+	TIMELM_OFFLOAD_CHAN(73, "SLPI_3", DMA_BIDIRECTIONAL, 5),
+	/* voice over PCIe (voice_mhi in audio_q6), stock ring 0 */
+	TIMELM_OFFLOAD_CHAN(80, "AUDIO_VOICE_0", DMA_BIDIRECTIONAL, 0),
+	/* hardware channels */
+	MHI_CHANNEL_CONFIG_UL(100, "IP_HW0", 512, 7, MHI_EE_AMSS,
+			      MHI_DB_BRST_ENABLE, false, 0, false, true, 0),
+	MHI_CHANNEL_CONFIG_DL(101, "IP_HW0", 512, 8, MHI_EE_AMSS,
+			      MHI_DB_BRST_ENABLE, false, 0, false, false,
+			      false, false, 0, 0),
+	TIMELM_OFFLOAD_CHAN(102, "IP_HW_ADPL", DMA_FROM_DEVICE, 9),
+	MHI_CHANNEL_CONFIG_DL(103, "IP_HW_QDSS", 128, 10, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, false, 0, 0),
+	MHI_CHANNEL_CONFIG_DL(104, "IP_HW0_RSC", 512, 8, MHI_EE_AMSS,
+			      MHI_DB_BRST_ENABLE, false, 0, false, false,
+			      false, false, 3078,
+			      MHI_CH_TYPE_INBOUND_COALESCED),
+	TIMELM_OFFLOAD_CHAN(105, "IP_HW_MHIP_0", DMA_TO_DEVICE, 11),
+	TIMELM_OFFLOAD_CHAN(106, "IP_HW_MHIP_0", DMA_FROM_DEVICE, 12),
+	TIMELM_OFFLOAD_CHAN(107, "IP_HW_MHIP_1", DMA_TO_DEVICE, 13),
+	TIMELM_OFFLOAD_CHAN(108, "IP_HW_MHIP_1", DMA_FROM_DEVICE, 14),
+	MHI_CHANNEL_CONFIG_UL(109, "RMNET_CTL", 128, 15, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false, 0),
+	MHI_CHANNEL_CONFIG_DL(110, "RMNET_CTL", 128, 16, MHI_EE_AMSS,
+			      MHI_DB_BRST_DISABLE, false, 0, false, false,
+			      false, false, 0, 0),
+};
+
+static struct mhi_event_config modem_qcom_sdx55_mhi_events[] = {
+	MHI_EVENT_CONFIG(0, 1, MHI_ER_CTRL, 32, 0,
+			 MHI_ER_PRIORITY_HI_NOSLEEP, MHI_DB_BRST_DISABLE, false,
+			 false, false, 0),
+	MHI_EVENT_CONFIG(1, 2, MHI_ER_DATA, 256, 0,
+			 MHI_ER_PRIORITY_DEFAULT_NOSLEEP, MHI_DB_BRST_DISABLE,
+			 false, false, false, 0),
+	MHI_EVENT_CONFIG(2, 3, MHI_ER_DATA, 256, 0,
+			 MHI_ER_PRIORITY_DEFAULT_NOSLEEP, MHI_DB_BRST_DISABLE,
+			 false, false, false, 0),
+	MHI_EVENT_CONFIG(3, 4, MHI_ER_DATA, 256, 0,
+			 MHI_ER_PRIORITY_DEFAULT_NOSLEEP, MHI_DB_BRST_DISABLE,
+			 false, false, false, 0),
+	/* 4: ADSP satellite, 5: SLPI satellite (client managed offload) */
+	MHI_EVENT_CONFIG(4, 0, MHI_ER_DATA, 512, 5,
+			 MHI_ER_PRIORITY_DEFAULT_NOSLEEP, MHI_DB_BRST_ENABLE,
+			 false, true, true, 0),
+	MHI_EVENT_CONFIG(5, 0, MHI_ER_DATA, 512, 5,
+			 MHI_ER_PRIORITY_DEFAULT_NOSLEEP, MHI_DB_BRST_ENABLE,
+			 false, true, true, 0),
+	/* 6: bandwidth scale (stock msi 0) */
+	MHI_EVENT_CONFIG(6, 0, MHI_ER_BW_SCALE, 64, 0,
+			 MHI_ER_PRIORITY_HI_SLEEP, MHI_DB_BRST_DISABLE, false,
+			 false, false, 0),
+	/* Hardware channels request dedicated hardware event rings */
+	MHI_EVENT_CONFIG(7, 5, MHI_ER_DATA, 1024, 5,
+			 MHI_ER_PRIORITY_DEFAULT_NOSLEEP, MHI_DB_BRST_ENABLE,
+			 true, false, false, 100),
+	MHI_EVENT_CONFIG(8, 6, MHI_ER_DATA, 2048, 5,
+			 MHI_ER_PRIORITY_DEFAULT_NOSLEEP,
+			 MHI_DB_BRST_ENABLE, true, true, false, 101),
+	MHI_EVENT_CONFIG(9, 0, MHI_ER_DATA, 0, 0,
+			 MHI_ER_PRIORITY_DEFAULT_NOSLEEP, MHI_DB_BRST_ENABLE,
+			 true, true, true, 102),
+	MHI_EVENT_CONFIG(10, 7, MHI_ER_DATA, 1024, 5,
+			 MHI_ER_PRIORITY_DEFAULT_NOSLEEP, MHI_DB_BRST_DISABLE,
+			 true, false, false, 103),
+	MHI_EVENT_CONFIG(11, 0, MHI_ER_DATA, 0, 0,
+			 MHI_ER_PRIORITY_DEFAULT_NOSLEEP, MHI_DB_BRST_ENABLE,
+			 true, true, true, 105),
+	MHI_EVENT_CONFIG(12, 0, MHI_ER_DATA, 0, 0,
+			 MHI_ER_PRIORITY_DEFAULT_NOSLEEP, MHI_DB_BRST_ENABLE,
+			 true, true, true, 106),
+	MHI_EVENT_CONFIG(13, 0, MHI_ER_DATA, 0, 0,
+			 MHI_ER_PRIORITY_DEFAULT_NOSLEEP, MHI_DB_BRST_ENABLE,
+			 true, true, true, 107),
+	MHI_EVENT_CONFIG(14, 0, MHI_ER_DATA, 0, 0,
+			 MHI_ER_PRIORITY_DEFAULT_NOSLEEP, MHI_DB_BRST_ENABLE,
+			 true, true, true, 108),
+	MHI_EVENT_CONFIG(15, 8, MHI_ER_DATA, 1024, 1,
+			 MHI_ER_PRIORITY_HI_NOSLEEP, MHI_DB_BRST_DISABLE, true,
+			 false, false, 109),
+	MHI_EVENT_CONFIG(16, 9, MHI_ER_DATA, 1024, 0,
+			 MHI_ER_PRIORITY_HI_NOSLEEP, MHI_DB_BRST_DISABLE, true,
+			 false, false, 110),
+};
+
+static const struct mhi_controller_config modem_qcom_sdx55_mhi_config = {
+	.max_channels = 128,
+	.timeout_ms = 2000,
+	.buf_len = 0x8000,
+	.num_channels = ARRAY_SIZE(modem_qcom_sdx55_mhi_channels),
+	.ch_cfg = modem_qcom_sdx55_mhi_channels,
+	.num_events = ARRAY_SIZE(modem_qcom_sdx55_mhi_events),
+	.event_cfg = modem_qcom_sdx55_mhi_events,
+};
+
+static const struct mhi_pci_dev_info mhi_qcom_sdx55_info = {
+	.device_id = 0x0306,
+	.name = "esoc0",
+	.fw_image = "sdx55m/sbl1.mbn",
+	.config = &modem_qcom_sdx55_mhi_config,
+	.bar_num = MHI_PCI_BAR_NUM,
+	.dma_data_width = 64,
+	.allow_m1 = false,
+	.skip_forced_suspend = true,
+	.sfr_support = true,
+	.timesync = false,
+	.drv_support = false,
+};
+
 static const struct mhi_pci_dev_info mhi_qcom_sdx65_info = {
 	.device_id = 0x0308,
 	.name = "esoc0",
@@ -381,6 +584,8 @@ static const struct mhi_pci_dev_info mhi_qcom_sxr_info = {
 	.drv_support = false,
 };
 static const struct pci_device_id mhi_pcie_device_id[] = {
+	{ PCI_DEVICE(MHI_PCIE_VENDOR_ID, 0x0306),
+		.driver_data = (kernel_ulong_t) &mhi_qcom_sdx55_info },
 	{ PCI_DEVICE(MHI_PCIE_VENDOR_ID, 0x0308),
 		.driver_data = (kernel_ulong_t) &mhi_qcom_sdx65_info },
 	{ PCI_DEVICE(MHI_PCIE_VENDOR_ID, 0x0309),
