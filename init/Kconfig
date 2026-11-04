@@ -952,6 +952,19 @@ menuconfig CGROUPS
 
 if CGROUPS
 
+config SCHED_TUNE_STUB
+	bool "schedtune cgroup controller stub (bring-up)"
+	help
+	  Register a minimal "schedtune" cgroup v1 controller.  CAF's real
+	  schedtune implementation (kernel/sched/tune.c) is not part of this
+	  kernel, but Android userspace (libprocessgroup's SetupCgroups()
+	  with cgroups.json) still mounts the hierarchy, and the whole
+	  builtin fails if it cannot.  The stub only provides the attribute
+	  files so the mount and the ROM's task_profiles writes succeed; the
+	  stored values have no effect on scheduling.
+
+	  If unsure, say N.
+
 config PAGE_COUNTER
 	bool
 
