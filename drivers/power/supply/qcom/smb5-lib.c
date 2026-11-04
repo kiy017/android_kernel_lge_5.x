@@ -5951,6 +5951,31 @@ static void smblib_handle_apsd_done(struct smb_charger *chg, bool rising)
 		   apsd_result->name);
 }
 
+/*
+ * timelm: 4.19 LG wa_retry_ok_to_pd (veneer-workaround lge,enable-retry-ok-to-pd).
+ * A hot-plugged PD source can be flagged as a legacy cable, which sets
+ * ok_to_pd = false.  APSD then sees nothing on D+/D- of a PD-only charger and
+ * reports SDP/float at the lowest ICL.  Rp 3A means it is a real Type-C
+ * source, so give PD one more try per attach.  Across a reboot early_usb_attach
+ * already allows PD, which is why a restart "fixes" it.
+ */
+static void smblib_timelm_retry_ok_to_pd(struct smb_charger *chg)
+{
+	if (chg->timelm_ok_to_pd_retried || chg->ok_to_pd ||
+	    chg->pd_disabled || chg->pd_not_supported)
+		return;
+
+	if (chg->real_charger_type != POWER_SUPPLY_TYPE_USB &&
+	    chg->real_charger_type != QTI_POWER_SUPPLY_TYPE_USB_FLOAT)
+		return;
+
+	if (smblib_get_prop_typec_mode(chg) != QTI_POWER_SUPPLY_TYPEC_SOURCE_HIGH)
+		return;
+
+	chg->timelm_ok_to_pd_retried = true;
+	chg->ok_to_pd = true;
+}
+
 irqreturn_t smb5_usb_source_change_irq_handler(int irq, void *data)
 {
 	struct smb_irq_data *irq_data = data;
@@ -6001,6 +6026,8 @@ irqreturn_t smb5_usb_source_change_irq_handler(int irq, void *data)
 		(bool)(stat & SLOW_PLUGIN_TIMEOUT_BIT));
 
 	smblib_hvdcp_adaptive_voltage_change(chg);
+
+	smblib_timelm_retry_ok_to_pd(chg);
 
 	power_supply_changed(chg->usb_psy);
 
@@ -6337,6 +6364,7 @@ static void typec_src_removal(struct smb_charger *chg)
 		dev_err(chg->dev,
 			"Couldn't disable secondary charger rc=%d\n", rc);
 
+	chg->timelm_ok_to_pd_retried = false;
 	chg->qc3p5_detected = false;
 	chg->qc3p5_detected_mw = 0;
 	typec_src_fault_condition_cfg(chg, false);
