@@ -4039,6 +4039,16 @@ static struct gdsc ufs_phy_gdsc = {
 		.name = "ufs_phy_gdsc",
 	},
 	.pwrsts = PWRSTS_OFF_ON,
+	/*
+	 * timelm bring-up: on this board the UFS PHY GDSC is only ever held
+	 * through the regulator front-end (gdsc-regulator, vdd-hba-supply of
+	 * the UFS PHY), so the genpd side has no consumers at all.  The
+	 * late_initcall_sync genpd_power_off_unused() then powers it off while
+	 * ufshcd is still doing link startup, and the UFS register block goes
+	 * away mid-DME (UIC 0x16 never completes, next readl hangs forever).
+	 * Mark it always-on so the genpd core refuses to power it off.
+	 */
+	.flags = ALWAYS_ON,
 };
 
 static struct gdsc usb30_prim_gdsc = {

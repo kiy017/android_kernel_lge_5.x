@@ -4939,6 +4939,14 @@ static int ufs_qcom_device_reset(struct ufs_hba *hba)
 	ufs_qcom_device_reset_ctrl(hba, false);
 	usleep_range(10, 15);
 
+	/*
+	 * timelm bring-up: the BCR reset above leaves the device cold, so give
+	 * it time to come out of reset before the host starts link startup.
+	 * 200 ms matches the settle time that made the link come up reliably
+	 * on the V60.
+	 */
+	msleep(200);
+
 	return 0;
 }
 
