@@ -3826,6 +3826,7 @@ static void psy_changed_notifier_work(struct work_struct *w)
 		 */
 		if (pd->timelm_pe_deferred && !pd->pd_connected) {
 			pd->timelm_pe_deferred = false;
+			usbpd_info(&pd->dev, "TIMELMCHG: PE_START retry, starting PE\n");
 			kick_sm(pd, 0);
 		}
 		return;
