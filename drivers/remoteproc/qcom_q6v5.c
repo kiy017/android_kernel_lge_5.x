@@ -15,6 +15,9 @@
 #include <linux/soc/qcom/smem_state.h>
 #include <linux/remoteproc.h>
 #include <linux/delay.h>
+#include <linux/rcupdate.h>
+#include <linux/sched/debug.h>
+#include <linux/sched/signal.h>
 #include "qcom_common.h"
 #include "qcom_q6v5.h"
 #include <trace/events/rproc_qcom.h>
@@ -61,6 +64,54 @@ void qcom_q6v5_register_ssr_subdev(struct qcom_q6v5 *q6v5, struct rproc_subdev *
 }
 EXPORT_SYMBOL(qcom_q6v5_register_ssr_subdev);
 
+static void q6v5_dump_peer_stacks(struct qcom_q6v5 *q6v5)
+{
+	static const char * const peers[] = {
+		"sscrpcd",
+		"sensors",
+		"android.hardware",
+		"fastrpc",
+		"system_server",
+		"surfaceflinger",
+		"bootanim",
+	};
+	struct task_struct *tasks[32];
+	struct task_struct *g, *t;
+	int i, n = 0;
+
+	rcu_read_lock();
+	for_each_process_thread(g, t) {
+		if (n >= ARRAY_SIZE(tasks))
+			break;
+
+		for (i = 0; i < ARRAY_SIZE(peers); i++) {
+			if (!strstr(t->comm, peers[i]))
+				continue;
+
+			get_task_struct(t);
+			tasks[n++] = t;
+			break;
+		}
+	}
+	rcu_read_unlock();
+
+	dev_err(q6v5->dev, "no-panic-on-crash: dumping %d peer task stacks\n", n);
+	for (i = 0; i < n; i++) {
+		/*
+		 * sched_show_task() prints its stack at the default log level,
+		 * which is above the console loglevel once init drops it to 3,
+		 * so nothing reaches pstore.  Print the state ourselves and pass
+		 * KERN_ERR to show_stack() so every frame is captured.
+		 */
+		pr_err("timelm: peer %s[%d] state=%c running=%d\n",
+		       tasks[i]->comm, tasks[i]->pid,
+		       task_state_to_char(tasks[i]),
+		       task_is_running(tasks[i]));
+		show_stack(tasks[i], NULL, KERN_ERR);
+		put_task_struct(tasks[i]);
+	}
+}
+
 static void qcom_q6v5_crash_handler_work(struct work_struct *work)
 {
 	struct qcom_q6v5 *q6v5 = container_of(work, struct qcom_q6v5, crash_handler);
@@ -88,6 +139,21 @@ static void qcom_q6v5_crash_handler_work(struct work_struct *work)
 	 * sync() and fclose() on attempting the dump.
 	 */
 	msleep(100);
+
+	/*
+	 * timelm: the SLPI/SSC watchdog fires on a sensor PD that has
+	 * exceeded its processing time limit.  Panicking here reboots the
+	 * whole phone and destroys the only useful diagnostics, so allow
+	 * boards to opt out and keep the AP alive with the remote down.
+	 */
+	if (q6v5->no_panic_on_crash) {
+		dev_err(q6v5->dev,
+			"no-panic-on-crash set, leaving %s offline\n",
+			q6v5->rproc->name);
+		q6v5_dump_peer_stacks(q6v5);
+		return;
+	}
+
 	panic("Panicking, remoteproc %s crashed\n", q6v5->rproc->name);
 }
 
@@ -390,6 +456,11 @@ int qcom_q6v5_init(struct qcom_q6v5 *q6v5, struct platform_device *pdev,
 		dev_err(&pdev->dev, "failed to acquire stop state\n");
 		return PTR_ERR(q6v5->state);
 	}
+
+	q6v5->no_panic_on_crash = of_property_read_bool(pdev->dev.of_node,
+							"qcom,no-panic-on-crash");
+	if (q6v5->no_panic_on_crash)
+		dev_info(&pdev->dev, "remoteproc crash will not panic the AP\n");
 
 	INIT_WORK(&q6v5->crash_handler, qcom_q6v5_crash_handler_work);
 
