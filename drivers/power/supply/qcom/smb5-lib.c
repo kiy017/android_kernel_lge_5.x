@@ -5974,6 +5974,8 @@ static void smblib_timelm_retry_ok_to_pd(struct smb_charger *chg)
 
 	chg->timelm_ok_to_pd_retried = true;
 	chg->ok_to_pd = true;
+	smblib_dbg(chg, PR_MISC, "TIMELMCHG: retry ok_to_pd, type=%d legacy=%d\n",
+		   chg->real_charger_type, chg->typec_legacy);
 }
 
 irqreturn_t smb5_usb_source_change_irq_handler(int irq, void *data)
@@ -6178,6 +6180,8 @@ static void typec_src_insertion(struct smb_charger *chg)
 	chg->typec_legacy = stat & TYPEC_LEGACY_CABLE_STATUS_BIT;
 	chg->ok_to_pd = (!(chg->typec_legacy || chg->pd_disabled)
 			|| chg->early_usb_attach) && !chg->pd_not_supported;
+	smblib_dbg(chg, PR_MISC, "TIMELMCHG: legacy=%d early_attach=%d ok_to_pd=%d\n",
+		   chg->typec_legacy, chg->early_usb_attach, chg->ok_to_pd);
 
 	/* allow apsd proceed to detect QC2/3 */
 	if (!chg->ok_to_pd)
