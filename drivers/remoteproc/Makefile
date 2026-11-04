@@ -29,6 +29,7 @@ obj-$(CONFIG_QCOM_Q6V5_MSS)		+= qcom_q6v5_mss.o
 obj-$(CONFIG_QCOM_Q6V5_PAS)		+= qcom_q6v5_pas.o
 obj-$(CONFIG_QCOM_SPSS)                 += qcom_spss.o
 obj-$(CONFIG_QCOM_ESOC)			+= qcom_esoc.o
+obj-$(CONFIG_TIMELM_SUBSYS_COMPAT)	+= timelm_subsys_compat.o
 qcom_esoc-y				+= esoc_bus.o
 qcom_esoc-$(CONFIG_QCOM_ESOC_DEV)	+= esoc_dev.o
 qcom_esoc-$(CONFIG_QCOM_ESOC_CLIENT)	+= esoc_client.o

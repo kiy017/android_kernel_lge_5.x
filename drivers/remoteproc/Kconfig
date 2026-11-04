@@ -227,6 +227,15 @@ config QCOM_SPSS
 	  remote processor. This also supports remote processors that
 	  are booted before kernel comes up.
 
+config TIMELM_SUBSYS_COMPAT
+	bool "timelm: 4.19 msm_subsys / subsys_<name> userspace compat"
+	help
+	  LG V60 (timelm): provide the msm-4.19 subsystem-restart userspace
+	  ABI (/sys/bus/msm_subsys/devices/subsysN/{name,state},
+	  /dev/subsys_<name> with open = boot, release = shutdown) for
+	  remoteprocs that register with it (the esoc0 external modem), as the
+	  4.19 vendor pm-service / libmdmdetect require it.
+
 config QCOM_ESOC
 	tristate "External SOCs Control"
 	help
