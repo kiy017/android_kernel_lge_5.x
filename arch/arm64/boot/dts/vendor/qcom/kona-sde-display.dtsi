@@ -1,0 +1,117 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * LG V60 ThinQ 5G (timelm) display glue for the msm-5.15 display
+ * techpack: DSI display connector, panel power rails, connectors list and
+ * the SW43103 FHD DSC command-mode panel.
+ */
+
+#include <dt-bindings/clock/mdss-7nm-pll-clk.h>
+
+#include "kona-sde.dtsi"
+#include "kona-sde-pll.dtsi"
+#include "dsi-panel-sw43103-pv-fhd-dsc-cmd.dtsi"
+
+&soc {
+	dsi_panel_pwr_supply_sm8250: dsi_panel_pwr_supply_sm8250 {
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		qcom,panel-supply-entry@0 {
+			reg = <0>;
+			qcom,supply-name = "vddi";
+			qcom,supply-min-voltage = <1800000>;
+			qcom,supply-max-voltage = <1800000>;
+			qcom,supply-enable-load = <62000>;
+			qcom,supply-disable-load = <80>;
+			qcom,supply-post-on-sleep = <20>;
+		};
+
+		qcom,panel-supply-entry@1 {
+			reg = <1>;
+			qcom,supply-name = "vpnl";
+			qcom,supply-min-voltage = <3000000>;
+			qcom,supply-max-voltage = <3000000>;
+			qcom,supply-enable-load = <857000>;
+			qcom,supply-disable-load = <0>;
+			qcom,supply-post-on-sleep = <0>;
+			qcom,supply-post-off-sleep = <10>;
+		};
+	};
+
+	sde_dsi: qcom,dsi-display-primary {
+		compatible = "qcom,dsi-display";
+		label = "primary";
+
+		qcom,dsi-ctrl = <&mdss_dsi0>;
+		qcom,dsi-phy = <&mdss_dsi_phy0>;
+
+		/*
+		 * "pll_byte_clk0"/"pll_dsi_clk0" resolve to the standalone
+		 * 7nm PLL mux clocks (BYTECLK_MUX_0_CLK / PCLK_MUX_0_CLK);
+		 * dsi_display_clocks_init() fetches them by these names and
+		 * matches the "pll_byte"/"pll_dsi" prefixes.  The MDP core
+		 * clock is a dummy vote to keep the dispcc sync-state
+		 * ordering correct.
+		 */
+		clocks = <&mdss_dsi0_pll BYTECLK_MUX_0_CLK>,
+			 <&mdss_dsi0_pll PCLK_MUX_0_CLK>,
+			 <&dispcc DISP_CC_MDSS_MDP_CLK>;
+		clock-names = "pll_byte_clk0", "pll_dsi_clk0",
+				"mdp_core_clk";
+
+		pinctrl-names = "panel_active", "panel_suspend";
+		pinctrl-0 = <&sde_dsi_active &sde_te_active>;
+		pinctrl-1 = <&sde_dsi_suspend &sde_te_suspend>;
+
+		qcom,platform-te-gpio = <&tlmm 66 0>;
+		qcom,panel-te-source = <0>;
+
+		vddi-supply = <&pm8150_l14>;
+		vpnl-supply = <&pm8150a_l11>;
+
+		qcom,mdp = <&mdss_mdp>;
+		qcom,dsi-default-panel = <&dsi_sw43103_pv_fhd_dsc_cmd>;
+	};
+
+	sde_wb: qcom,wb-display@0 {
+		compatible = "qcom,wb-display";
+		cell-index = <0>;
+		label = "wb_display";
+	};
+};
+
+&mdss_mdp {
+	connectors = <&sde_dsi &smmu_sde_unsec &smmu_sde_sec &sde_wb &sde_rscc>;
+};
+
+&dsi_sw43103_pv_fhd_dsc_cmd {
+	qcom,panel-supply-entries = <&dsi_panel_pwr_supply_sm8250>;
+	qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_dcs";
+	qcom,mdss-dsi-bl-min-level = <5>;
+	qcom,mdss-dsi-bl-max-level = <2047>;
+	qcom,mdss-brightness-max-level = <365>;
+	/*
+	 * The driver defaults this to 15% of brightness-max-level (54/365) when
+	 * the property is absent, and applies it from the first commit - that is
+	 * the "boot animation is dim" result of img42 (TIMELMBL: update_status
+	 * brightness=54 -> DBV 302/2047).  LG boots at full scale.
+	 */
+	qcom,mdss-brightness-init-level = <365>;
+	/*
+	 * The LG panel is big-endian for DCS 0x51 (stock:
+	 * lge,dcs-brightness-bigendian).  In this driver the property means
+	 * "byte-swap the DBV": without it dsi_panel_update_backlight() always
+	 * sends bl_inverted_dbv = 0, i.e. brightness 0 -> black OLED.
+	 */
+	qcom,mdss-dsi-bl-inverted-dbv;
+	qcom,platform-reset-gpio = <&tlmm 75 0>;
+	qcom,platform-te-gpio = <&tlmm 66 0>;
+	/*
+	 * LG drives "lge,panel-pins = <&pm8150l_gpios 4 0>" high during
+	 * panel-on and low during panel-off (lge,panel-on-pin-seq = <0 1 0>).
+	 * The upstream-gen driver has no notion of extra panel pins, but
+	 * qcom,platform-en-gpio is driven high just before the reset
+	 * sequence and low on power-off, which is the same order.
+	 */
+	qcom,platform-en-gpio = <&pm8150l_gpios 4 0>;
+};

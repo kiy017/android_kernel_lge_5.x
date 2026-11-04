@@ -1,0 +1,896 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * LG V60 ThinQ 5G (timelm) board glue.
+ *
+ * Ported from the 4.19 LG downstream tree
+ * (arch/arm64/boot/dts/vendor/lge/kona-timelm/) onto the msm-5.15
+ * downstream kona base.  Only the boot-critical subset lives here;
+ * display / touch / audio / sensors are added separately.
+ */
+
+#include <dt-bindings/gpio/gpio.h>
+#include <dt-bindings/input/input.h>
+#include <dt-bindings/iio/qcom,spmi-vadc.h>
+#include <dt-bindings/iio/qti_power_supply_iio.h>
+
+/ {
+	/*
+	 * Memory base is fixed; the bootloader (LK) fills in the size,
+	 * matching the comment in sm8250.dtsi / the working mainline DTB.
+	 */
+	memory {
+		device_type = "memory";
+		reg = <0x0 0x80000000 0x0 0x0>;
+	};
+};
+
+/*
+ * V60 ADSP/SPSS/CDSP firmware carve-outs.  The generic kona base sizes
+ * ADSP at 0x1d00000 (ending at 0x8be00000); the LG firmware reserves a
+ * larger ADSP (0x2500000, ending at 0x8c600000) which shifts SPSS and the
+ * CDSP secure heap up.  These values are taken verbatim from the live V60
+ * device tree so we never clobber a firmware region.
+ */
+&rproc_adsp_mem {
+	reg = <0x0 0x8a100000 0x0 0x2500000>;
+};
+
+&rproc_spss_mem {
+	reg = <0x0 0x8c600000 0x0 0x100000>;
+};
+
+&cdsp_secure_heap {
+	reg = <0x0 0x8c700000 0x0 0x4600000>;
+};
+
+/*
+ * The SSC firmware on this device raises a fatal/watchdog error when a
+ * sensor PD exceeds its processing time limit.  kona-slpi-pas is built with
+ * rproc->recovery_disabled, so the q6v5 crash handler would otherwise call
+ * panic() and reboot the phone.  Keep the AP alive instead so the failure is
+ * observable (logcat/ramoops) and the rest of the system can boot.
+ *
+ * img53: with the SLPI left offline every ISensors activate times out after
+ * 8 s and screen wake stalls system_server for ~14 s (frozen screen).  The
+ * vendor init only knows the 4.19 /sys/bus/msm_subsys SSR knobs, so enable
+ * remoteproc recovery for the SLPI from the DT (qcom_q6v5_pas.c).
+ */
+&slpi_pas {
+	qcom,no-panic-on-crash;
+	qcom,timelm-recovery;
+};
+
+/*
+ * Board carve-outs not present in the generic kona base: the continuous
+ * splash / display ramdump buffers and the persistent ramoops store.
+ * Addresses match the live V60 DT.
+ */
+&reserved_memory {
+	/*
+	 * Continuous splash is deliberately DISABLED on timelm.
+	 *
+	 * The SDE driver only enables the cont-splash handoff path when it
+	 * finds a reserved-memory child node literally named "splash_region"
+	 * (_sde_kms_get_splash_data(), sde_kms.c: of_find_node_by_name(parent,
+	 * "splash_region")).  The node is kept (so the bootloader framebuffer
+	 * address range stays out of the page allocator) but renamed, which
+	 * makes the lookup fail and leaves splash_data zeroed:
+	 * sde_kms_cont_splash_config() then takes the
+	 * "cont_splash feature not enabled" path and
+	 * dsi_display_cont_splash_config() is never called, so
+	 * display->is_cont_splash_enabled stays false.
+	 *
+	 * That is required here because cont-splash mode makes the DSI stack
+	 * assume the bootloader already brought the panel up:
+	 *   - is_skip_op_required() then skips dsi_panel_pre_prepare(),
+	 *     dsi_panel_prepare() and dsi_panel_enable(), i.e. the panel
+	 *     reset + init sequence is never sent;
+	 *   - dsi_clk_manager skips dsi_link_hs_clk_set_rate() and the
+	 *     PHY PLL config/toggle callbacks entirely
+	 *     (dsi_clk_manager.c: "if (mngr->is_cont_splash_enabled)
+	 *     return 0"), so byte/pixel clocks and the DSI PLL are never
+	 *     programmed and the panel would get no clock even if it were
+	 *     initialised.
+	 * The V60 bootloader does not leave a usable DSI/panel state behind,
+	 * so the screen stayed black.  With the node renamed the kernel runs
+	 * the full panel bring-up itself.
+	 */
+	cont_splash_memory: splash_mem@9c000000 {
+		reg = <0x0 0x9c000000 0x0 0x1200000>;
+		label = "cont_splash_region";
+	};
+
+	disp_rdump_memory: disp_rdump_region@9c000000 {
+		reg = <0x0 0x9c000000 0x0 0x1200000>;
+		label = "disp_rdump_region";
+	};
+
+	/*
+	 * ramoops layout, deliberately the one that has been giving us logs.
+	 *
+	 * reg spans the whole 3 MB LG carve-out.  Because mem-size is not
+	 * given, the driver hands the 0x80000 not claimed by console/ftrace/
+	 * pmsg to dmesg records, which puts our zones at:
+	 *
+	 *   0xb0000000  dmesg records (128 x 4K)
+	 *   0xb0080000  console   (0x40000)   <-- our log
+	 *   0xb00c0000  ftrace    (0x40000)
+	 *   0xb0100000  pmsg      (0x200000)
+	 *
+	 * The recovery (LG 4.19 node: mem 0x280000, console at 0xb0000000)
+	 * exposes 0xb0080000..0xb0280000 as pmsg-ramoops-0, i.e. its 2 MB
+	 * pmsg zone starts exactly where our console ring lives.  That is why
+	 * `cat /sys/fs/pstore/pmsg-ramoops-0` in the recovery returns our full
+	 * 5.15 boot log, and why it survives: the recovery's logd only appends
+	 * ~30 KB per boot, while its console ring (which we are NOT using)
+	 * rotates every ~590 B/s.  Do not "fix" this to the stock 0x280000
+	 * layout - that moves our console to 0xb0000000 and the log is then
+	 * only reachable through console-ramoops-0, which the recovery
+	 * overwrites within a minute.
+	 */
+	ramoops_mem: ramoops_region@b0000000 {
+		compatible = "ramoops";
+		reg = <0x0 0xb0000000 0x0 0x300000>;
+		record-size = <0x1000>;
+		console-size = <0x40000>;
+		ftrace-size = <0x40000>;
+		pmsg-size = <0x200000>;
+		ecc-size = <0x0>;
+	};
+};
+
+/*
+ * Debug UART (QUPv3 SE12) is disabled.
+ *
+ * The GENI driver registers its ttyMSM0 console from
+ * uart_add_one_port()->register_console()->msm_geni_console_setup(), which
+ * calls msm_geni_serial_resources_on()/port_setup() while the parent
+ * ac0000.qcom,qupv3_1_geni_se wrapper is still probing.  That has been
+ * observed to lock up the GENI SE hard (boot 9: silence at 1.852 s right on
+ * the "ttyMSM0 at MMIO" line, with every other thread's printk stuck behind
+ * the port lock).  Removing the console= cmdline does not help because the
+ * console is registered by the driver itself.
+ *
+ * Kernel logging goes to the ramoops pstore console; /dev/console is
+ * provided by CONFIG_NULL_TTY.  Re-enable only together with a fix for the
+ * probe ordering (or a working console handover after boot).
+ */
+&qupv3_se12_2uart {
+	status = "disabled";
+};
+
+&ufsphy_mem {
+	compatible = "qcom,ufs-phy-qmp-v4-kona";
+
+	vdda-phy-supply = <&pm8150_l5>;
+	vdda-phy-always-on;
+	vdda-pll-supply = <&pm8150_l9>;
+	vdda-phy-max-microamp = <89900>;
+	vdda-pll-max-microamp = <18800>;
+
+	status = "ok";
+};
+
+&ufshc_mem {
+	vdd-hba-supply = <&ufs_phy_gdsc>;
+	vdd-hba-fixed-regulator;
+	vcc-supply = <&pm8150_l17>;
+	vcc-voltage-level = <2504000 2950000>;
+	vcc-low-voltage-sup;
+	vccq-supply = <&pm8150_l6>;
+	vccq2-supply = <&pm8150_s4>;
+	vcc-max-microamp = <800000>;
+	vccq-max-microamp = <800000>;
+	vccq2-max-microamp = <800000>;
+
+	qcom,vddp-ref-clk-supply = <&pm8150_l6>;
+	qcom,vddp-ref-clk-max-microamp = <100>;
+	qcom,vccq-parent-supply = <&pm8150a_s8>;
+	qcom,vccq-parent-max-microamp = <210000>;
+
+	status = "ok";
+};
+
+&sdhc_2 {
+	vdd-supply = <&pm8150a_l9>;
+	qcom,vdd-voltage-level = <2950000 2960000>;
+	qcom,vdd-current-level = <200 800000>;
+
+	vdd-io-supply = <&pm8150a_l6>;
+	qcom,vdd-io-voltage-level = <1808000 2960000>;
+	qcom,vdd-io-current-level = <200 22000>;
+
+	pinctrl-names = "default", "sleep";
+	pinctrl-0 = <&sdc2_on>;
+	pinctrl-1 = <&sdc2_off>;
+
+	cd-gpios = <&tlmm 77 GPIO_ACTIVE_LOW>;
+
+	status = "ok";
+};
+
+/*
+ * PMIC rail tuning for the V60 board.
+ *
+ * The generic kona regulator tables in kona-regulators.dtsi are Qualcomm's
+ * reference values, not LG's.  LG overrides several rails in
+ *   kona-timelm_common-panel.dtsi            (&pm8150a_l11)
+ *   kona-timelm_common-pm.dtsi               (&pm8150a_l4)
+ *   kona-timelm_dcm_jp_rev-1.0-overlay.dts   (&pm8150a_l3)
+ * and the live device DT confirms the result.  Without these the rails come
+ * up at the reference voltage instead of the one the hardware is built for.
+ */
+
+/*
+ * vpnl - the panel's 3.0 V rail (pm8150a_l11 -> L11C).
+ *
+ * This one is load-bearing: &dsi_sw43103_pv_fhd_dsc_cmd asks for
+ * qcom,supply-min/max-voltage = <3000000>.  With the reference constraints
+ * (3104000..3304000) regulator_set_voltage() clamps min up to 3104000 and
+ * then fails with -EINVAL ("unsupportable voltage range: 3104000-3000000uV"),
+ * which aborts dsi_pwr_enable_vregs() and the panel never powers on.
+ * Fixed 3.0 V makes both the request and the applied voltage match LG.
+ */
+&pm8150a_l11 {
+	regulator-min-microvolt = <3000000>;
+	regulator-max-microvolt = <3000000>;
+	qcom,init-voltage = <3000000>;
+};
+
+/*
+ * pm8150a_l3 - accessory/DS3 detect rail on this board revision; LG runs it
+ * at 1.2 V (rev-1.0 overlay) while the reference table initialises 0.8 V.
+ * No in-tree consumer, but the rail is still programmed at registration.
+ */
+&pm8150a_l3 {
+	regulator-min-microvolt = <1200000>;
+	regulator-max-microvolt = <1200000>;
+	qcom,init-voltage = <1200000>;
+};
+
+/*
+ * pm8150a_l4 / pm8150a_l5 - camera VIO rails.  Initial voltage is already
+ * 1.8 V in both trees, but LG narrows the constraints to 1.8 V fixed.
+ * Kept for fidelity with the shipping device; no consumer yet.
+ */
+&pm8150a_l4 {
+	regulator-min-microvolt = <1800000>;
+	regulator-max-microvolt = <1800000>;
+	qcom,init-voltage = <1800000>;
+};
+
+&pm8150a_l5 {
+	regulator-min-microvolt = <1800000>;
+	regulator-max-microvolt = <1800000>;
+	qcom,init-voltage = <1800000>;
+};
+
+/*
+ * ---------------------------------------------------------------------------
+ * Battery / fuel gauge
+ * ---------------------------------------------------------------------------
+ *
+ * The kona base brings up pm8150b_fg with no  qcom,battery-data  at all and
+ * with no batt_id ADC channel, so fg-gen4 cannot select a profile: every
+ * capacity read returns -ENODEV (visible in the img42 boot log as
+ * "smblib_get_prop_batt_capacity: Couldn't get capacity prop rc=-19" once a
+ * second) and android.hardware.health never publishes IHealth.
+ *
+ * The two LG packs and the tuning below are the ones the shipping device
+ * uses; see timelm-batterydata.dtsi for the profile provenance.
+ */
+/ {
+	timelm_batterydata: qcom,battery-data {
+		qcom,batt-id-range-pct = <15>;
+		#include "timelm-batterydata.dtsi"
+	};
+};
+
+&pm8150b_fg {
+	qcom,battery-data = <&timelm_batterydata>;
+	qcom,hold-soc-while-full;
+	qcom,linearize-soc;
+	qcom,five-pin-battery;
+	qcom,fg-force-load-profile;
+
+	/* ESR fast calibration */
+	qcom,fg-esr-timer-chg-fast = <0 7>;
+	qcom,fg-esr-timer-dischg-fast = <0 7>;
+	qcom,fg-esr-timer-chg-slow = <0 96>;
+	qcom,fg-esr-timer-dischg-slow = <0 96>;
+	qcom,fg-esr-cal-soc-thresh = <26 230>;
+	qcom,fg-esr-cal-temp-thresh = <10 40>;
+	qcom,fg-delta-soc-thr = <3>;
+
+	qcom,ki-coeff-soc-dischg = <100 25 7>;
+	qcom,ki-coeff-low-dischg = <367 367 367>;
+	qcom,ki-coeff-med-dischg = <310 310 200>;
+	qcom,ki-coeff-hi-dischg = <310 400 550>;
+	qcom,ki-coeff-dischg-low-med-thresh-ma = <100>;
+	qcom,ki-coeff-dischg-med-hi-thresh-ma = <1400>;
+
+	/* battery-ID resistor, channel 0x4b (ADC5_BAT_ID_100K_PU) */
+	#io-channel-cells = <1>;
+	io-channels = <&pm8150b_vadc ADC5_BAT_ID_100K_PU>,
+		      <&pm8150b_charger PSY_IIO_CHARGE_DONE>,
+		      <&pm8150b_charger PSY_IIO_RECHARGE_SOC>;
+	io-channel-names = "batt_id",
+			   "charge_done",
+			   "recharge_soc";
+};
+
+&pm8150b_charger {
+	qcom,battery-data = <&timelm_batterydata>;
+	qcom,step-charging-enable;
+	qcom,auto-recharge-soc = <98>;
+	qcom,otg-cl-ua = <2000000>;
+	qcom,wd-bark-time-secs = <16>;
+
+	/*
+	 * smb5 reads the ADC channels directly and pulls the QG/FG
+	 * properties through the charger node (smblib_qg_ext_iio_chan[]),
+	 * so every one of these names must resolve or the whole list is
+	 * rejected and smblib_get_prop_batt_capacity() keeps returning
+	 * -ENODEV.  "mid_voltage" (ADC5_MID_CHG_DIV6) is deliberately
+	 * absent: pm8150b.dtsi does not define that vadc channel and
+	 * smblib_read_mid_voltage_chan() handles a NULL mid_chan.
+	 */
+	io-channels = <&pm8150b_vadc ADC5_USB_IN_V_16>,
+		      <&pm8150b_vadc ADC5_USB_IN_I>,
+		      <&pm8150b_vadc ADC5_SBUx>,
+		      <&pm8150b_vadc ADC5_VPH_PWR>,
+		      <&pm8150b_vadc ADC5_DIE_TEMP>,
+		      <&pm8150b_vadc ADC5_CHG_TEMP>,
+		      <&pm8150b_fg PSY_IIO_DEBUG_BATTERY>,
+		      <&pm8150b_fg PSY_IIO_CAPACITY>,
+		      <&pm8150b_fg PSY_IIO_REAL_CAPACITY>,
+		      <&pm8150b_fg PSY_IIO_CC_SOC>,
+		      <&pm8150b_fg PSY_IIO_CURRENT_NOW>,
+		      <&pm8150b_fg PSY_IIO_VOLTAGE_NOW>,
+		      <&pm8150b_fg PSY_IIO_VOLTAGE_MAX>,
+		      <&pm8150b_fg PSY_IIO_CHARGE_FULL>,
+		      <&pm8150b_fg PSY_IIO_RESISTANCE_ID>,
+		      <&pm8150b_fg PSY_IIO_TEMP>,
+		      <&pm8150b_fg PSY_IIO_CHARGE_COUNTER>,
+		      <&pm8150b_fg PSY_IIO_CYCLE_COUNT>,
+		      <&pm8150b_fg PSY_IIO_CHARGE_FULL_DESIGN>,
+		      <&pm8150b_fg PSY_IIO_TIME_TO_FULL_NOW>;
+	io-channel-names = "usb_in_voltage",
+			   "usb_in_current",
+			   "sbux_res",
+			   "vph_voltage",
+			   "die_temp",
+			   "chg_temp",
+			   "debug_battery",
+			   "capacity",
+			   "real_capacity",
+			   "cc_soc",
+			   "current_now",
+			   "voltage_now",
+			   "voltage_max",
+			   "charge_full",
+			   "resistance_id",
+			   "temp",
+			   "charge_counter",
+			   "cycle_count",
+			   "charge_full_design",
+			   "time_to_full_now";
+};
+
+/*
+ * Vibrator: LG wires a Dongwoon DW7800 ERM driver to QUPv3 SE15
+ * (i2c@884000) instead of using the PM8150B haptics block.  The vendor
+ * vibrator HAL (android.hardware.vibrator-service.lge) talks to it through
+ * /dev/tspdrv, so the driver must probe for that node to exist and for the
+ * HAL to publish android.hardware.vibrator.IVibrator/default: SystemServer
+ * blocks in VibratorManagerService until that interface appears.
+ *
+ * Values are taken verbatim from the live V60 device tree.
+ */
+&qupv3_se15_i2c {
+	status = "ok";
+
+	dw7800_vibrator: dw7800@59 {
+		compatible = "dongwoon,dw7800";
+		status = "ok";
+		reg = <0x59>;
+		dongwoon,vpwr-on = <0>;
+	};
+};
+
+/* The DW7800 replaces the PMIC haptics driver and its boost regulator. */
+&pm8150b_haptics {
+	status = "disabled";
+};
+
+&vreg_hap_boost {
+	status = "disabled";
+};
+
+/*
+ * Touch: LG SW42902 (SiW) on QUPv3 SE13 (i2c@a94000), driven by the LG touch
+ * core ported from the stock 4.19 kernel (drivers/input/touchscreen/lge).
+ * Values are taken verbatim from the live V60 device tree (the sw42000@28
+ * alternative is disabled there and omitted here).  The FW images are loaded
+ * from /vendor/firmware/touch/timelm (CONFIG_LGE_TOUCH_FW_PATH).
+ */
+&qupv3_se13_i2c {
+	status = "ok";
+
+	sw42902@28 {
+		compatible = "lge,sw42902";
+		reg = <0x28>;
+		status = "ok";
+		interrupt-parent = <&tlmm>;
+		interrupts = <39 0x2008>;
+		irqflags = <0x02>;
+
+		vdd-gpio = <&tlmm 68 0>;
+		vcl-gpio = <&tlmm 67 0>;
+		reset-gpio = <&tlmm 38 0>;
+		irq-gpio = <&tlmm 39 0x2008>;
+
+		max_x = <1080>;
+		max_y = <2460>;
+		max_pressure = <0xff>;
+		max_width_major = <2460>;
+		max_width_minor = <2460>;
+		max_orientation = <90>;
+		max_id = <10>;
+
+		hw_reset_delay = <90>;
+		sw_reset_delay = <10>;
+
+		use_lpwg = <1>;
+		use_lpwg_test = <1>;
+		hide_coordinate = <1>;
+		use_activepen_status = <1>;
+		use_film_status = <1>;
+		use_dex_mode = <1>;
+
+		fw_image = "touch/timelm/B3W68TIME_0_74.img", "touch/timelm/B3W68DS3_0_16.img";
+		panel_spec = "touch/timelm/Time_limit.txt";
+		panel_spec_mfts_folder = "touch/timelm/Time_limit.txt";
+
+		use_asc = <0>;
+		low_delta_thres = <350>;
+		high_delta_thres = <600>;
+		max_delta_cnt = <2>;
+
+		use_perf_test = <1>;
+		test_delay = <8>;
+		test_pressure = <50>;
+		test_width = <100>;
+		click_test_x = <180>;
+		click_test_y = <760>;
+		v_drag_test_x = <144>;
+		v_drag_test_start_y = <2003>;
+		v_drag_test_end_y = <1116>;
+		h_drag_test_start_x = <1163>;
+		h_drag_test_end_x = <276>;
+		h_drag_test_y = <2184>;
+	};
+};
+
+/*
+ * USB-PD policy engine (qpnp-pdphy): the 5.15 usbpd driver fetches these 14
+ * IIO channels from the PM8150B charger and fails usbpd_create() with -ENODEV
+ * when any is missing ("failed to get pd_active iio channel").  The pdphy is
+ * also the extcon provider for ssusb@a600000, so without it dwc3-msm defers
+ * forever and there is no USB device mode (no adb).  Same wiring as
+ * kona-hdk.dtsi.
+ */
+
+&pm8150b_pdphy {
+	#io-channel-cells = <1>;
+	io-channels = <&pm8150b_charger PSY_IIO_PD_ACTIVE>,
+		      <&pm8150b_charger PSY_IIO_TYPEC_CC_ORIENTATION>,
+		      <&pm8150b_charger PSY_IIO_CONNECTOR_TYPE>,
+		      <&pm8150b_charger PSY_IIO_TYPEC_POWER_ROLE>,
+		      <&pm8150b_charger PSY_IIO_PD_USB_SUSPEND_SUPPORTED>,
+		      <&pm8150b_charger PSY_IIO_TYPEC_SRC_RP>,
+		      <&pm8150b_charger PSY_IIO_PD_IN_HARD_RESET>,
+		      <&pm8150b_charger PSY_IIO_PD_CURRENT_MAX>,
+		      <&pm8150b_charger PSY_IIO_PR_SWAP>,
+		      <&pm8150b_charger PSY_IIO_PD_VOLTAGE_MIN>,
+		      <&pm8150b_charger PSY_IIO_PD_VOLTAGE_MAX>,
+		      <&pm8150b_charger PSY_IIO_USB_REAL_TYPE>,
+		      <&pm8150b_charger PSY_IIO_TYPEC_MODE>,
+		      <&pm8150b_charger PSY_IIO_PE_START>;
+	io-channel-names = "pd_active",
+			   "typec_cc_orientation",
+			   "connector_type",
+			   "typec_power_role",
+			   "pd_usb_suspend_supported",
+			   "typec_src_rp",
+			   "pd_in_hard_reset",
+			   "pr_current_max",
+			   "pr_swap",
+			   "pd_voltage_min",
+			   "pd_voltage_max",
+			   "real_type",
+			   "typec_mode",
+			   "pe_start";
+};
+
+/*
+ * QCA6390 Wi-Fi (cnss2) on PCIe RC0.  Values from the live V60 DT
+ * (v60-live.dts wlan: qcom,cnss-qca6390@b0000000), written in the 5.15
+ * binding of wlan/kona-iot-vc-cnss.dtsi.  Rails checked against the live DT:
+ * aon and dig are both S6A on timelm (the IoT reference uses S2F for dig).
+ * The 4.19 msm-bus vectors and mhi_channels are dropped: 5.15 cnss2 takes
+ * interconnects + qcom,bus-bw-cfg, and its MHI config is in code.
+ * No qcom,converged-dt / same-dt-multi-dev: those switch cnss2 to
+ * "qca6390/"-prefixed firmware names, stock uses plain amss20.bin/bdwlan.elf.
+ * The cnss_wlan_en_* pins and cnss_wlan_mem come from kona-pinctrl.dtsi /
+ * kona.dtsi and already match the live DT.
+ */
+&soc {
+	wlan: qcom,cnss-qca6390@b0000000 {
+		compatible = "qcom,cnss-qca6390";
+		reg = <0xb0000000 0x10000>,
+		      <0xb2e5510 0x5c0>;
+		reg-names = "smmu_iova_ipa", "tcs_cmd";
+		wlan-en-gpio = <&tlmm 20 0>;
+		qcom,bt-en-gpio = <&tlmm 21 0>;
+		qcom,sw-ctrl-gpio = <&tlmm 124 0>;
+		pinctrl-names = "wlan_en_active", "wlan_en_sleep";
+		pinctrl-0 = <&cnss_wlan_en_active>;
+		pinctrl-1 = <&cnss_wlan_en_sleep>;
+		/*
+		 * 5.15 marker: cnss2, cnss_utils, wlan_firmware_service,
+		 * cnss_plat_ipc_qmi_svc, cnss_prealloc and cnss_nl all return
+		 * -ENODEV from module_init without an available node carrying
+		 * it (img54 died on this in first stage init).
+		 */
+		qcom,wlan;
+		qcom,wlan-rc-num = <0>;
+		qcom,wlan-ramdump-dynamic = <0x420000>;
+		qcom,smmu-s1-enable;
+		cnss-daemon-support;
+		qcom,cmd_db_name = "smpf2";
+		qcom,set-wlaon-pwr-ctrl;
+		cnss-enable-self-recovery;
+		/*
+		 * timelm: qcacld loads from the boot ramdisk in first stage;
+		 * hold its registration until init.target.rc writes fs_ready
+		 * (cnss2 pci.c).  Drop once the modules live in /vendor.
+		 */
+		qcom,timelm-wait-fs-ready;
+
+		vdd-wlan-aon-supply = <&S6A>;
+		qcom,vdd-wlan-aon-config = <950000 950000 0 0 1>;
+		vdd-wlan-dig-supply = <&S6A>;
+		qcom,vdd-wlan-dig-config = <950000 952000 0 0 1>;
+		vdd-wlan-io-supply = <&S4A>;
+		qcom,vdd-wlan-io-config = <1800000 1800000 0 0 1>;
+		vdd-wlan-rfa1-supply = <&S5A>;
+		qcom,vdd-wlan-rfa1-config = <1900000 1900000 0 0 1>;
+		vdd-wlan-rfa2-supply = <&S8C>;
+		qcom,vdd-wlan-rfa2-config = <1350000 1350000 0 0 1>;
+		wlan-ant-switch-supply = <&L5C>;
+		qcom,wlan-ant-switch-config = <1800000 1800000 0 0 0>;
+
+		interconnects = <&aggre2_noc MASTER_PCIE_0 &mc_virt SLAVE_EBI1>;
+		interconnect-names = "pcie_to_ddr";
+
+		qcom,icc-path-count = <1>;
+		qcom,bus-bw-cfg-count = <7>;
+		qcom,bus-bw-cfg =
+		/* no vote */
+		<0 0>,
+		/* idle: 0-18 Mbps, ddr freq: 451.2 MHz */
+		<2250 1600000>,
+		/* low: 18-60 Mbps, ddr freq: 451.2 MHz*/
+		<7500 1600000>,
+		/* medium: 60-240 Mbps, ddr freq: 451.2 MHz */
+		<30000 1804800>,
+		/* high: 240 - 800 Mbps, ddr freq: 451.2 MHz */
+		<100000 1804800>,
+		/* very high: 800 - 1400 Mbps, ddr freq: 1555.2 MHz */
+		<175000 6220800>,
+		/* low (latency critical): 18 - 60 Mbps, ddr freq: 547.2 MHz */
+		<7500 2188800>;
+	};
+};
+
+/*
+ * 5.15 pci-msm builds its host bridge with devm_pci_alloc_host_bridge(),
+ * which parses "ranges" through the OF PCI range parser.  That only treats
+ * the node as a PCI bus with device_type = "pci" (or a node named "pcie");
+ * kona-pcie.dtsi (and the 4.19 DT) lack it, so img55 had no host bridge
+ * window at all: nothing at 0x6xxxxxxx in /proc/iomem, RC0 bridge window
+ * programmed disabled (0xfff0), QCA6390 BAR0 (1 MB, 64-bit) left unassigned
+ * and cnss_pci_enable_bus() -> pci_assign_resource() failed.  kalama-pcie.dtsi
+ * sets it on every RC.
+ */
+&pcie0 {
+	device_type = "pci";
+};
+
+&pcie0_rp {
+	#address-cells = <5>;
+	#size-cells = <0>;
+
+	cnss_pci: cnss_pci {
+		reg = <0 0 0 0 0>;
+		qcom,iommu-group = <&cnss_pci_iommu_group>;
+		memory-region = <&cnss_wlan_mem>;
+
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		cnss_pci_iommu_group: cnss_pci_iommu_group {
+			qcom,iommu-dma-addr-pool = <0xa0000000 0x10000000>;
+			qcom,iommu-dma = "fastmap";
+			qcom,iommu-pagetable = "coherent";
+			qcom,iommu-faults = "stall-disable", "HUPCF", "no-CFRE",
+					    "non-fatal";
+		};
+	};
+};
+
+/*
+ * QCA6390 Bluetooth (img73): btpower (bt-kernel/pwr, /dev/btpower + rfkill)
+ * and the HS UART the vendor HAL opens as /dev/ttyHS0 (alias hsuart0).
+ * Values from the live V60 DT (v60-live.dts bt_qca6390), rewritten in the
+ * 5.15 qcom,* binding (4.19 used qca,*).  Rails as stock: aon and dig on
+ * S6A at 950 mV, rfa1 S5A 1.9 V, rfa2 S8C 1.35 V (the 5.15 qca6390 defaults
+ * are 966 mV and rfa2 1.9 V, outside S8C's 1.2-1.4 V).  The kona-bt.dtsi
+ * reference extras are left out: stock has no ASD rail and no sw-ctrl in
+ * the BT node (gpio 124 is the cnss sw-ctrl), dig is not pm8009_s2.
+ * No btfm SLIMbus slave yet (BT audio comes later).
+ */
+&soc {
+	bluetooth: bt_qca6390 {
+		compatible = "qcom,qca6390";
+		pinctrl-names = "default";
+		pinctrl-0 = <&bt_en_sleep>;
+		qcom,bt-reset-gpio = <&tlmm 21 0>; /* BT_EN */
+		mboxes = <&qmp_aop 0>;
+
+		qcom,bt-vdd-aon-supply = <&S6A>;
+		qcom,bt-vdd-dig-supply = <&S6A>;
+		qcom,bt-vdd-rfa1-supply = <&S5A>;
+		qcom,bt-vdd-rfa2-supply = <&S8C>;
+
+		qcom,bt-vdd-aon-config = <950000 950000 0 0>;
+		qcom,bt-vdd-dig-config = <950000 952000 0 0>;
+		qcom,bt-vdd-rfa1-config = <1900000 1900000 0 0>;
+		qcom,bt-vdd-rfa2-config = <1350000 1350000 0 0>;
+	};
+};
+
+&qupv3_se6_4uart {
+	status = "ok";
+};
+
+/*
+ * Volume up + Assistant keys (v60-live.dts gpio_keys, LG
+ * kona-timelm_dcm_jp-misc.dtsi).  Volume down and power are PON keys.  gpio1
+ * also needs key_home_default: stock gets that pull-up from its qbt_handler
+ * node, which this DT doesn't have.  The LG dual-screen/cover switches of the
+ * stock node (tlmm 121/126/134) are not ported.
+ */
+&soc {
+	gpio_keys {
+		compatible = "gpio-keys";
+		label = "gpio-keys";
+
+		pinctrl-names = "default";
+		pinctrl-0 = <&key_vol_up_default &key_home_default>;
+
+		vol_up {
+			label = "volume_up";
+			gpios = <&pm8150_gpios 6 GPIO_ACTIVE_LOW>;
+			linux,input-type = <1>;
+			linux,code = <KEY_VOLUMEUP>;
+			gpio-key,wakeup;
+			debounce-interval = <15>;
+			linux,can-disable;
+		};
+
+		hot1_key {
+			label = "hot1_key";
+			gpios = <&pm8150_gpios 1 GPIO_ACTIVE_LOW>;
+			linux,input-type = <1>;
+			linux,code = <377>;
+			gpio-key,wakeup;
+			debounce-interval = <15>;
+			linux,can-disable;
+		};
+	};
+};
+
+/*
+ * SDX55 external modem (img75), stage 1: esoc control + PCIe RC2 + MHI.
+ * Values from the live V60 DT (v60-live.dts mdm0: qcom,mdm0, pcie2 >
+ * pcie2_rp > mhi_0), written in the 5.15 binding of waipio-lemur.dtsi /
+ * sdxlemur-external-soc.dtsi.  The modem is on RC2 (stock RC1 is disabled).
+ *  - no soft-reset GPIO: sdx55m warm reset goes through the qcom,modem-reset
+ *    PON of the pmxprairie PMIC (qpnp_pon_modem_pwr_off()), enabled below.
+ *  - the MHI channel/event config is in code (mhi_qcom.c, 0x0306); the stock
+ *    msm-bus vectors (0/0/500000/1000000 KBps) become qcom,mhi-bus-bw-cfg.
+ *  - RC2 is enumerated by the modem itself (WAKE#, gpio 87) after esoc power
+ *    on, as boot-option 1 leaves it alone at probe.
+ */
+&soc {
+	mdm0: qcom,mdm0 {
+		compatible = "qcom,ext-sdx55m";
+		cell-index = <0>;
+		#address-cells = <0>;
+		interrupt-parent = <&mdm0>;
+		#interrupt-cells = <1>;
+		interrupt-map-mask = <0xffffffff>;
+		interrupt-names = "err_fatal_irq", "status_irq";
+		interrupt-map = <0 &tlmm 1 0x3
+				 1 &tlmm 3 0x3>;
+		qcom,ramdump-delay-ms = <3000>;
+		qcom,ramdump-timeout-ms = <120000>;
+		qcom,vddmin-modes = "normal";
+		qcom,vddmin-drive-strength = <8>;
+		qcom,sfr-query;
+		qcom,sysmon-id = <20>;
+		qcom,ssctl-instance-id = <0x10>;
+		qcom,support-shutdown;
+		qcom,pil-force-shutdown;
+		qcom,esoc-skip-restart-for-mdm-crash;
+		pinctrl-names = "mdm_active", "mdm_suspend";
+		pinctrl-0 = <&ap2mdm_active &mdm2ap_active>;
+		pinctrl-1 = <&ap2mdm_sleep &mdm2ap_sleep>;
+		qcom,mdm2ap-errfatal-gpio = <&tlmm 1 0x00>;
+		qcom,ap2mdm-errfatal-gpio = <&tlmm 57 0x00>;
+		qcom,mdm2ap-status-gpio = <&tlmm 3 0x00>;
+		qcom,ap2mdm-status-gpio = <&tlmm 56 0x00>;
+		qcom,mdm-link-info = "0306_02.01.00";
+		status = "ok";
+	};
+};
+
+&spmi_bus {
+	qcom,pmxprairie@8 {
+		status = "ok";
+
+		qcom,power-on@800 {
+			status = "ok";
+		};
+	};
+};
+
+&pcie2 {
+	device_type = "pci";
+};
+
+&pcie2_rp {
+	#address-cells = <5>;
+	#size-cells = <0>;
+
+	mhi_0: qcom,mhi@0 {
+		reg = <0 0 0 0 0>;
+
+		esoc-names = "mdm";
+		esoc-0 = <&mdm0>;
+
+		interconnects = <&aggre1_noc MASTER_PCIE_2 &mc_virt SLAVE_EBI1>;
+		interconnect-names = "pcie_to_ddr";
+
+		qcom,mhi-bus-bw-cfg =
+		<0 0>,		/* no vote */
+		<250000 0>,	/* Gen1 */
+		<500000 0>,	/* Gen2 (stock case 2) */
+		<1000000 0>,	/* Gen3 (stock case 3) */
+		<1000000 0>;	/* Gen4 */
+
+		qcom,iommu-group = <&mhi_0_iommu_group>;
+
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		mhi_0_iommu_group: mhi_0_iommu_group {
+			qcom,iommu-dma-addr-pool = <0x20000000 0x1fffffff>;
+			qcom,iommu-dma = "fastmap";
+			qcom,iommu-pagetable = "coherent";
+			/*
+			 * img81: 5.15 arm-smmu BUG()s on an unhandled context
+			 * fault unless the group is non-fatal (img80 panicked on
+			 * a modem DMA fault at the SBL -> AMSS switch with the
+			 * ADSP satellite channels). Same set as cnss_pci.
+			 */
+			qcom,iommu-faults = "stall-disable", "HUPCF", "no-CFRE",
+					    "non-fatal";
+		};
+	};
+};
+
+/*
+ * Audio stage 1 (img57): Elite ADSP boot + APR + q6core.  Ported from the
+ * live V60 DT (v60-live.dts audio_apr / adsp_loader); the 5.15 additions are
+ * qcom,rproc-handle on adsp-loader (rproc_boot instead of PIL) and the
+ * qcom,adsp-notify node the 5.15 audio_notifier binds to.  Codec/LPI/sound
+ * children of q6core come in later stages.
+ */
+/*
+ * Bring-up: an ADSP fatal error must not panic the AP (qcom_q6v5.c
+ * no_panic_on_crash, img44) or a crash on first boot of the new audio stack
+ * becomes a boot loop.  Recovery stays disabled, so the ADSP stays offline
+ * and the crash reason is in dmesg.  Revisit once audio is stable.
+ */
+&adsp_pas {
+	qcom,no-panic-on-crash;
+};
+
+&soc {
+	adsp_notify: qcom,msm-adsp-notify {
+		compatible = "qcom,adsp-notify";
+		qcom,rproc-handle = <&adsp_pas>;
+	};
+
+	audio_apr: qcom,msm-audio-apr {
+		compatible = "qcom,msm-audio-apr";
+		qcom,subsys-name = "apr_adsp";
+
+		msm_audio_ion: qcom,msm-audio-ion {
+			compatible = "qcom,msm-audio-ion";
+			qcom,smmu-version = <2>;
+			qcom,smmu-enabled;
+			iommus = <&apps_smmu 0x1801 0x0>;
+			qcom,iommu-dma-addr-pool = <0x10000000 0x10000000>;
+			qcom,smmu-sid-mask = /bits/ 64 <0xf>;
+		};
+
+		q6core: qcom,q6core-audio {
+			compatible = "qcom,q6core-audio";
+		};
+
+		/*
+		 * img77: voice over PCIe to the SDX55 (stock voice_mhi_audio):
+		 * audio_q6 voice_mhi allocates the MVM mailbox (size from
+		 * mailbox_mem, kona.dtsi), maps it for the ADSP and on PCIe for
+		 * MHI AUDIO_VOICE_0, and votes the link during calls.
+		 */
+		voice_mhi_audio: qcom,voice-mhi-audio {
+			compatible = "qcom,voice-mhi-audio";
+			memory-region = <&mailbox_mem>;
+			voice_mhi_voting;
+		};
+	};
+
+	adsp_loader: qcom,msm-adsp-loader {
+		compatible = "qcom,adsp-loader";
+		qcom,adsp-state = <0>;
+		qcom,rproc-handle = <&adsp_pas>;
+	};
+};
+
+/*
+ * Audio stage 2 (img58): Elite platform devices (FE PCMs, routing, AFE/BE DAI
+ * ports, TDM/MI2S/AUXPCM/CDC-DMA groups) verbatim from the live V60 DT;
+ * MI2S pinctrl mapped to the kona-pinctrl.dtsi labels (configs identical).
+ */
+#include "kona-timelm-audio-platform.dtsi"
+
+/*
+ * Audio stage 3 (img59): q6core subtree (LPASS votes, bolero + rx/tx/va/wsa
+ * macros + SWR masters + wcd938x/wsa881x slaves, LPI pinctrl, kona sound
+ * card), macro core/NPL clock nodes, cdc pinctrl, stub codec, compress
+ * platform nodes, and the LG I2C codecs (TFA9878 x2, ES9218P, FSA4480) on
+ * qupv3_se15_i2c.  Generated by timelm-bsp/tools/port-live-subtrees.py
+ * (spec timelm-bsp/tools/audio-stage3.json) from v60-live.dts.  Sound node:
+ * ext-disp (DP) audio and wcn-bt (BT SCO/FM over SLIMbus 7) links off for
+ * now, their codecs aren't built; RPMh clock 4.19 index 4 (LN_BB_CLK2) -> 5.15 2.
+ */
+#include "kona-timelm-audio-codecs.dtsi"
+
+/*
+ * SWR bus numbers come from these aliases (soundwire.c swr_register_master:
+ * of_alias_get_id(np, "swr")); without them all 3 masters ask for bus 0 and
+ * the 2nd fails with -ENOSPC (img59).  Same as the live DT.  Kept here, not
+ * in the generated kona-timelm-audio-codecs.dtsi (regenerated by the tool).
+ */
+/ {
+	aliases {
+		swr0 = &swr0;	/* wsa_swr_master */
+		swr1 = &swr1;	/* rx_swr_master */
+		swr2 = &swr2;	/* tx_swr_master */
+	};
+};
