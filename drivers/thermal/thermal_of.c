@@ -1090,6 +1090,7 @@ int __init of_parse_thermal_zones(void)
 	for_each_available_child_of_node(np, child) {
 		struct thermal_zone_device *zone;
 		struct thermal_zone_params *tzp;
+		const char *gov;
 		int i, mask = 0;
 		u32 prop;
 
@@ -1116,6 +1117,15 @@ int __init of_parse_thermal_zones(void)
 
 		if (!of_property_read_u32(child, "sustainable-power", &prop))
 			tzp->sustainable_power = prop;
+
+		/*
+		 * timelm: per-zone governor from DT, as in the QC 4.19 of-thermal
+		 * (stock LG DT uses it).  The QTI thermal HAL only arms trips on
+		 * zones whose policy is user_space, e.g. skin-msm-therm-usr.
+		 */
+		if (!of_property_read_string(child, "thermal-governor", &gov))
+			strscpy(tzp->governor_name, gov,
+				sizeof(tzp->governor_name));
 
 		for (i = 0; i < tz->ntrips; i++)
 			mask |= 1 << i;
