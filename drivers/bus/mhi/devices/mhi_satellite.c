@@ -496,6 +496,9 @@ iommu_map_cmd_completion:
 				    (code == MHI_EV_CC_SUCCESS) ? "successful" :
 				    "failed", iova);
 
+			pr_info("mhi_sat: timelm IOMMU MAP phys 0x%llx len 0x%x -> iova 0x%llx\n",
+				(u64)MHI_TRE_GET_PTR(pkt), (u32)MHI_TRE_GET_SIZE(pkt),
+				(u64)iova);
 			pkt->ptr = MHI_TRE_EVT_CMD_COMPLETION_PTR(iova);
 			pkt->dword[0] = MHI_TRE_EVT_CMD_COMPLETION_D0(code);
 			pkt->dword[1] = MHI_TRE_EVT_CMD_COMPLETION_D1;
