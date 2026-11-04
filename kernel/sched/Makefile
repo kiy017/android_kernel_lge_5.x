@@ -39,3 +39,6 @@ obj-$(CONFIG_PSI) += psi.o
 obj-$(CONFIG_SCHED_CORE) += core_sched.o
 obj-$(CONFIG_SCHED_WALT) += walt/
 obj-$(CONFIG_ANDROID_VENDOR_HOOKS) += vendor_hooks.o
+
+# timelm bring-up: minimal schedtune cgroup controller
+obj-$(CONFIG_SCHED_TUNE_STUB) += schedtune_stub.o
