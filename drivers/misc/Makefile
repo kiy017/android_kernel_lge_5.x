@@ -64,6 +64,7 @@ obj-$(CONFIG_OPEN_DICE)		+= open-dice.o
 obj-$(CONFIG_QSEECOM_PROXY) 	+= qseecom_proxy.o
 obj-$(CONFIG_QSEECOM_QTI)	+= qseecom_qti/
 obj-$(CONFIG_TIMELM_ION)	+= timelm_ion.o
+obj-$(CONFIG_TIMELM_ION)	+= timelm_uldump.o
 obj-$(CONFIG_QPNP_MISC)		+= qpnp-misc.o
 obj-$(CONFIG_PROFILER)		+= profiler.o
 obj-$(CONFIG_QRC)		+= qrc/
