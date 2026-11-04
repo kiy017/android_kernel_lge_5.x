@@ -301,9 +301,16 @@ static int gdsc_enable(struct regulator_dev *rdev)
 	}
 
 	regmap_read(sc->regmap, REG_OFFSET, &regval);
+	/* timelm TMPDBG: trace the display GDSC power-on attempts only */
+	if (sc->rdesc.name && strstr(sc->rdesc.name, "mdss"))
+		pr_err("TIMELMGDSC: %s enable enter reg=0x%08x hw_ctrl=%d hw_bit=%d\n",
+			sc->rdesc.name, regval, sc->is_gdsc_hw_ctrl_mode,
+			!!(regval & HW_CONTROL_MASK));
 	if (regval & HW_CONTROL_MASK) {
 		dev_warn(&rdev->dev, "Invalid enable while %s is under HW control\n",
 				sc->rdesc.name);
+		pr_err("TIMELMGDSC: %s enable refused (-EBUSY) reg=0x%08x\n",
+			sc->rdesc.name, regval);
 		return -EBUSY;
 	}
 
