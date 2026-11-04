@@ -376,7 +376,7 @@ struct smem_image_version {
 };
 #endif /* CONFIG_DEBUG_FS */
 
-#define MAX_SOCINFO_ATTRS 50
+#define MAX_SOCINFO_ATTRS 52
 /* sysfs attributes */
 #define ATTR_DEFINE(param)      \
 	static DEVICE_ATTR(param, 0444, \
@@ -697,6 +697,28 @@ msm_get_platform_subtype_id(struct device *dev,
 			hw_subtype);
 }
 ATTR_DEFINE(platform_subtype_id);
+
+/*
+ * timelm: LG board revision as /sys/devices/soc0/hw_rev (stock 4.19 ABI,
+ * socinfo.c msm_get_hw_rev() -> lge_get_board_revision()).  The SEE registry
+ * generator (/vendor/etc/sensors/sns_reg_config) keys the magnetometer config
+ * on it; LK passes it as androidboot.vendor.lge.hw.revision=rev_xx.
+ */
+static char timelm_hw_rev[16] = "rev_10";
+
+static int __init timelm_hw_rev_setup(char *str)
+{
+	strscpy(timelm_hw_rev, str, sizeof(timelm_hw_rev));
+	return 1;
+}
+__setup("androidboot.vendor.lge.hw.revision=", timelm_hw_rev_setup);
+
+static ssize_t
+msm_get_hw_rev(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return scnprintf(buf, PAGE_SIZE, "%s\n", timelm_hw_rev);
+}
+ATTR_DEFINE(hw_rev);
 
 static ssize_t
 msm_get_platform_subtype(struct device *dev,
@@ -1630,6 +1652,7 @@ static void socinfo_populate_sysfs(struct qcom_socinfo *qcom_socinfo)
 		break;
 	}
 
+	msm_custom_socinfo_attrs[i++] = &dev_attr_hw_rev.attr;
 	msm_custom_socinfo_attrs[i++] = &image_version.attr;
 	msm_custom_socinfo_attrs[i++] = &image_variant.attr;
 	msm_custom_socinfo_attrs[i++] = &image_crm_version.attr;
