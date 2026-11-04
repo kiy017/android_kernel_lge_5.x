@@ -487,11 +487,73 @@ static void pstore_unregister_kmsg(void)
 }
 
 #ifdef CONFIG_PSTORE_CONSOLE
+/*
+ * TMPDBG (timelm): the persistent console zone is only 256 KB - its size is
+ * fixed by the recovery-side dump window - and a display that never completes
+ * a commit makes SDE log the same handful of DRM_ERROR lines several times a
+ * second.  That alone evicts the boot history we need (img32 kept 29.4 s -
+ * 90.3 s of a boot whose interesting part is 10-25 s).  Drop a line that was
+ * already written verbatim in the last 10 s.  Only the persistent ring is
+ * affected, dmesg/printk are untouched.  Remove with the TIMELMTRACE hooks.
+ */
+#define PSTORE_CONSOLE_DEDUP_SLOTS	32
+#define PSTORE_CONSOLE_DEDUP_WINDOW	msecs_to_jiffies(10000)
+
+static struct {
+	u32 hash[PSTORE_CONSOLE_DEDUP_SLOTS];
+	unsigned long stamp[PSTORE_CONSOLE_DEDUP_SLOTS];
+	unsigned int next;
+} pstore_console_dedup;
+
+static u32 pstore_console_hash(const char *s, unsigned int c)
+{
+	u32 h = 2166136261u;
+	unsigned int i;
+
+	for (i = 0; i < c; i++) {
+		h ^= (u8)s[i];
+		h *= 16777619u;
+	}
+
+	return h ? h : 1;
+}
+
+static bool pstore_console_repeat(u32 hash)
+{
+	unsigned long now = jiffies;
+	unsigned int i;
+
+	for (i = 0; i < PSTORE_CONSOLE_DEDUP_SLOTS; i++)
+		if (pstore_console_dedup.hash[i] == hash &&
+		    time_before(now, pstore_console_dedup.stamp[i] +
+				      PSTORE_CONSOLE_DEDUP_WINDOW))
+			return true;
+
+	pstore_console_dedup.hash[pstore_console_dedup.next] = hash;
+	pstore_console_dedup.stamp[pstore_console_dedup.next] = now;
+	pstore_console_dedup.next = (pstore_console_dedup.next + 1) %
+				    PSTORE_CONSOLE_DEDUP_SLOTS;
+
+	return false;
+}
+
 static void pstore_console_write(struct console *con, const char *s, unsigned c)
 {
 	struct pstore_record record;
 
 	if (!c)
+		return;
+
+	if (pstore_console_repeat(pstore_console_hash(s, c)))
+		return;
+
+	/*
+	 * img144: on the LM-V600TM the boot with /data unmounted logged 567
+	 * SELinux denials (147 KB of the 256 KB ring) between 9.4 s and 14.9 s
+	 * and evicted vold's metadata decryption at ~5 s.  Keep them in dmesg
+	 * only.
+	 */
+	if (strnstr(s, " avc:  ", c))
 		return;
 
 	pstore_record_init(&record, psinfo);
