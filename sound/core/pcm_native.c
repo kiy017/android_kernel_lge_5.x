@@ -1432,7 +1432,13 @@ static int snd_pcm_pre_start(struct snd_pcm_substream *substream,
 		return -EBADFD;
 	if (atomic_read(&runtime->buffer_accessing) < 0)
 		return -EBADFD; /* during hw_params, hw_free or prepare */
+	/*
+	 * timelm: QC 4.19 - a hostless substream (hw_no_buffer, e.g. the
+	 * VoiceMMode1 FE: voice runs ADSP <-> modem) never has playback data,
+	 * so starting it must not fail with -EPIPE.
+	 */
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK &&
+	    !substream->hw_no_buffer &&
 	    !snd_pcm_playback_data(substream))
 		return -EPIPE;
 	runtime->trigger_tstamp_latched = false;

@@ -2511,3 +2511,165 @@ int snd_pcm_add_chmap_ctls(struct snd_pcm *pcm, int stream,
 	return 0;
 }
 EXPORT_SYMBOL_GPL(snd_pcm_add_chmap_ctls);
+
+/*
+ * timelm: QC 4.19 PCM volume/user control API (sound/core/pcm_lib.c of
+ * LG's 4.19 kernel), restored for the Elite audio-kernel.
+ */
+#define STRING_LENGTH_OF_INT 12
+#define MAX_USR_CTRL_CNT 128
+
+static int pcm_volume_ctl_info(struct snd_kcontrol *kcontrol,
+				struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = 1;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = 0x2000;
+	return 0;
+}
+
+static void pcm_volume_ctl_private_free(struct snd_kcontrol *kcontrol)
+{
+	struct snd_pcm_volume *info = snd_kcontrol_chip(kcontrol);
+
+	info->pcm->streams[info->stream].vol_kctl = NULL;
+	kfree(info);
+}
+
+int snd_pcm_add_volume_ctls(struct snd_pcm *pcm, int stream,
+			   const struct snd_pcm_volume_elem *volume,
+			   int max_length,
+			   unsigned long private_value,
+			   struct snd_pcm_volume **info_ret)
+{
+	struct snd_pcm_volume *info;
+	struct snd_kcontrol_new knew = {
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.access = SNDRV_CTL_ELEM_ACCESS_TLV_READ |
+			SNDRV_CTL_ELEM_ACCESS_READWRITE,
+		.info = pcm_volume_ctl_info,
+	};
+	int err;
+	int size;
+
+	info = kzalloc(sizeof(*info), GFP_KERNEL);
+	if (!info)
+		return -ENOMEM;
+	info->pcm = pcm;
+	info->stream = stream;
+	info->volume = volume;
+	info->max_length = max_length;
+	size = sizeof("Playback ") + sizeof(" Volume") +
+		STRING_LENGTH_OF_INT*sizeof(char) + 1;
+	knew.name = kzalloc(size, GFP_KERNEL);
+	if (!knew.name) {
+		kfree(info);
+		return -ENOMEM;
+	}
+	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+		snprintf((char *)knew.name, size, "%s %d %s",
+			"Playback", pcm->device, "Volume");
+	else
+		snprintf((char *)knew.name, size, "%s %d %s",
+			"Capture", pcm->device, "Volume");
+	knew.device = pcm->device;
+	knew.count = pcm->streams[stream].substream_count;
+	knew.private_value = private_value;
+	info->kctl = snd_ctl_new1(&knew, info);
+	if (!info->kctl) {
+		kfree(info);
+		kfree(knew.name);
+		return -ENOMEM;
+	}
+	info->kctl->private_free = pcm_volume_ctl_private_free;
+	err = snd_ctl_add(pcm->card, info->kctl);
+	if (err < 0) {
+		/* snd_ctl_add() frees kctl (and info via private_free) */
+		kfree(knew.name);
+		return -ENOMEM;
+	}
+	pcm->streams[stream].vol_kctl = info->kctl;
+	if (info_ret)
+		*info_ret = info;
+	kfree(knew.name);
+	return 0;
+}
+EXPORT_SYMBOL(snd_pcm_add_volume_ctls);
+
+static int pcm_usr_ctl_info(struct snd_kcontrol *kcontrol,
+			    struct snd_ctl_elem_info *uinfo)
+{
+	uinfo->type = SNDRV_CTL_ELEM_TYPE_INTEGER;
+	uinfo->count = MAX_USR_CTRL_CNT;
+	uinfo->value.integer.min = 0;
+	uinfo->value.integer.max = INT_MAX;
+	return 0;
+}
+
+static void pcm_usr_ctl_private_free(struct snd_kcontrol *kcontrol)
+{
+	struct snd_pcm_usr *info = snd_kcontrol_chip(kcontrol);
+
+	info->pcm->streams[info->stream].usr_kctl = NULL;
+	kfree(info);
+}
+
+int snd_pcm_add_usr_ctls(struct snd_pcm *pcm, int stream,
+			 const struct snd_pcm_usr_elem *usr,
+			 int max_length, int max_kctrl_str_len,
+			 unsigned long private_value,
+			 struct snd_pcm_usr **info_ret)
+{
+	struct snd_pcm_usr *info;
+	struct snd_kcontrol_new knew = {
+		.iface = SNDRV_CTL_ELEM_IFACE_MIXER,
+		.access = SNDRV_CTL_ELEM_ACCESS_READWRITE,
+		.info = pcm_usr_ctl_info,
+	};
+	int err;
+	char *buf;
+
+	info = kzalloc(sizeof(*info), GFP_KERNEL);
+	if (!info)
+		return -ENOMEM;
+
+	info->pcm = pcm;
+	info->stream = stream;
+	info->usr = usr;
+	info->max_length = max_length;
+	buf = kzalloc(max_kctrl_str_len, GFP_KERNEL);
+	if (!buf) {
+		kfree(info);
+		return -ENOMEM;
+	}
+	knew.name = buf;
+	if (stream == SNDRV_PCM_STREAM_PLAYBACK)
+		snprintf(buf, max_kctrl_str_len, "%s %d %s",
+			"Playback", pcm->device, "User kcontrol");
+	else
+		snprintf(buf, max_kctrl_str_len, "%s %d %s",
+			"Capture", pcm->device, "User kcontrol");
+	knew.device = pcm->device;
+	knew.count = pcm->streams[stream].substream_count;
+	knew.private_value = private_value;
+	info->kctl = snd_ctl_new1(&knew, info);
+	if (!info->kctl) {
+		kfree(info);
+		kfree(knew.name);
+		return -ENOMEM;
+	}
+	info->kctl->private_free = pcm_usr_ctl_private_free;
+	err = snd_ctl_add(pcm->card, info->kctl);
+	if (err < 0) {
+		/* snd_ctl_add() frees kctl (and info via private_free) */
+		kfree(knew.name);
+		return -ENOMEM;
+	}
+	pcm->streams[stream].usr_kctl = info->kctl;
+	if (info_ret)
+		*info_ret = info;
+	kfree(knew.name);
+	return 0;
+}
+EXPORT_SYMBOL(snd_pcm_add_usr_ctls);
