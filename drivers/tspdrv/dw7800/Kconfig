@@ -1,0 +1,9 @@
+# SPDX-License-Identifier: GPL-2.0-only
+
+config VIB_DW7800
+	tristate "TouchSense dw7800 driver support"
+	default n
+	depends on I2C
+	help
+	  TouchSense haptics driver for the Dongwoon DW7800 I2C vibrator.
+	  Provides /dev/tspdrv used by the LG vibrator HAL.
