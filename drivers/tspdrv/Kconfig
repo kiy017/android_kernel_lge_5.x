@@ -1,0 +1,10 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# TouchSense/tspdrv family configuration
+#
+
+menu "Tspdrv support"
+
+source "drivers/tspdrv/dw7800/Kconfig"
+
+endmenu
