@@ -1290,6 +1290,25 @@ static int msm_geni_serial_ioctl(struct uart_port *uport, unsigned int cmd,
 	if (port->pm_auto_suspend_disable)
 		return ret;
 
+	/*
+	 * timelm: the 4.19 vendor BT HAL (android.hardware.bluetooth@1.0-impl-qti)
+	 * votes the UART clocks with the old asm-generic TIOCPMGET/PUT/ACT
+	 * numbers (0x544D..0x544F); 5.15 moved them to 0x54ED..0x54EF.  Without
+	 * the votes the port autosuspends and IBS wake-ups lose the RX bytes.
+	 * TIOCFAULT (0x54EC) kept its number.
+	 */
+	switch (cmd) {
+	case 0x544D:
+		cmd = MSM_GENI_SERIAL_TIOCPMGET;
+		break;
+	case 0x544E:
+		cmd = MSM_GENI_SERIAL_TIOCPMPUT;
+		break;
+	case 0x544F:
+		cmd = MSM_GENI_SERIAL_TIOCPMACT;
+		break;
+	}
+
 	switch (cmd) {
 	case MSM_GENI_SERIAL_TIOCPMGET: {
 		ret = vote_clock_on(uport);
