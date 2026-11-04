@@ -311,6 +311,14 @@ static int vb2_fill_vb2_v4l2_buffer(struct vb2_buffer *vb, struct v4l2_buffer *b
 
 	/* Zero flags that we handle */
 	vbuf->flags = b->flags & ~V4L2_BUFFER_MASK_FLAGS;
+	/*
+	 * timelm: bit 0x80 is V4L2_BUF_FLAG_IN_REQUEST here but
+	 * V4L2_BUF_FLAG_END_OF_SUBFRAME in the QC 4.19 msm_vidc uapi used by
+	 * the vendor codec HAL.  Queues without the Request API never own it,
+	 * so let it through as a driver/userspace flag (4.19 behaviour).
+	 */
+	if (!q->supports_requests)
+		vbuf->flags |= b->flags & V4L2_BUF_FLAG_IN_REQUEST;
 	if (!vb->vb2_queue->copy_timestamp || V4L2_TYPE_IS_CAPTURE(b->type)) {
 		/*
 		 * Non-COPY timestamps and non-OUTPUT queues will get
@@ -575,6 +583,9 @@ static void __fill_v4l2_buffer(struct vb2_buffer *vb, void *pb)
 	 * Clear any buffer state related flags.
 	 */
 	b->flags &= ~V4L2_BUFFER_MASK_FLAGS;
+	/* timelm: keep QC END_OF_SUBFRAME (= IN_REQUEST bit), see above */
+	if (!q->supports_requests)
+		b->flags |= vbuf->flags & V4L2_BUF_FLAG_IN_REQUEST;
 	b->flags |= q->timestamp_flags & V4L2_BUF_FLAG_TIMESTAMP_MASK;
 	if (!q->copy_timestamp) {
 		/*
