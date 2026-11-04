@@ -99,7 +99,10 @@ obj-$(CONFIG_DRM_SUN4I) += sun4i/
 obj-y			+= tilcdc/
 obj-$(CONFIG_DRM_QXL) += qxl/
 obj-$(CONFIG_DRM_VIRTIO_GPU) += virtio/
-obj-$(CONFIG_DRM_MSM) += msm/
+# timelm builds the downstream SDE display techpack (techpack/display) in
+# place of the in-tree MSM DRM driver: both produce msm_drm.{o,ko} and would
+# collide.  CONFIG_DRM_MSM therefore selects the techpack only.
+# obj-$(CONFIG_DRM_MSM) += msm/
 obj-$(CONFIG_DRM_TEGRA) += tegra/
 obj-$(CONFIG_DRM_STM) += stm/
 obj-$(CONFIG_DRM_STI) += sti/
@@ -128,3 +131,5 @@ obj-$(CONFIG_DRM_TIDSS) += tidss/
 obj-y			+= xlnx/
 obj-y			+= gud/
 obj-$(CONFIG_DRM_HYPERV) += hyperv/
+# timelm: Xiaomi mi_disp_notifier, used by the display techpack (mi_disp/)
+obj-y += xiaomi/
