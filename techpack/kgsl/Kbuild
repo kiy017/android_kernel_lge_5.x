@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# timelm: Adreno 650 KGSL (graphics-kernel -> msm_kgsl.ko), previously built
+# by hand (M=graphics-kernel KGSL_PATH=... MODNAME=msm_kgsl BOARD_PLATFORM=kona).
+# config/gki_kona.conf is pulled in through CONFIG_ARCH_KONA.
+
+export KGSL_PATH := $(realpath $(srctree)/$(src)/graphics-kernel)
+export KERNEL_SRC := $(abs_srctree)
+export MODNAME := msm_kgsl
+export BOARD_PLATFORM := kona
+
+obj-m += graphics-kernel/

@@ -1,0 +1,147 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# Downstream Qualcomm display techpack configuration.
+#
+# These symbols live outside the main Kconfig tree (in the upstream kernel
+# they are injected by the DLKM build via config/<target>disp.conf).  Because
+# timelm builds the techpack directly into vmlinux we declare them here so
+# `make olddefconfig` keeps the values selected by the board fragment.
+#
+# CONFIG_DRM_MSM itself is declared by drivers/gpu/drm/msm/Kconfig (the
+# in-tree MSM DRM directory is excluded from the build; see
+# drivers/gpu/drm/Makefile).
+
+menu "Qualcomm display techpack (SDE)"
+
+config DRM_MSM_SDE
+	bool "SDE (Snapdragon Display Engine) support"
+	depends on DRM_MSM
+	default y
+	help
+	  Downstream SDE KMS driver used by Qualcomm display panels.
+
+config DRM_MSM_REGISTER_LOGGING
+	bool "Register logging"
+	depends on DRM_MSM
+	default y
+
+config DRM_SDE_WB
+	bool "SDE writeback support"
+	depends on DRM_MSM_SDE
+	default y
+
+config DRM_SDE_RSC
+	bool "SDE resource state coordinator"
+	depends on DRM_MSM_SDE
+	default y
+
+config DRM_SDE_EVTLOG_DEBUG
+	bool "SDE event log debug"
+	depends on DRM_MSM_SDE
+	default y
+
+config DSI_PARSER
+	bool "DSI parser"
+	depends on DRM_MSM_DSI
+	default y
+
+config QCOM_MDSS_PLL
+	bool "MDSS PLL clock driver"
+	depends on DRM_MSM_DSI
+	default y
+
+config QCOM_MDSS_DP_PLL
+	bool "MDSS DP PLL clock driver"
+	depends on DRM_MSM_DP
+	default y
+
+config MSM_SDE_ROTATOR
+	bool "SDE rotator"
+	depends on DRM_MSM_SDE
+	default n
+
+config MSM_SDE_ROTATOR_EVTLOG_DEBUG
+	bool "SDE rotator event log debug"
+	depends on MSM_SDE_ROTATOR
+	default n
+
+config DRM_SDE_VM
+	bool "SDE virtual machine support"
+	depends on DRM_MSM_SDE
+	default n
+
+config DRM_MSM_DP_MST
+	bool "DisplayPort MST support"
+	depends on DRM_MSM_DP
+	default n
+
+config DRM_MSM_DP_USBPD_LEGACY
+	bool "DisplayPort USBPD (legacy)"
+	depends on DRM_MSM_DP
+	default n
+
+config HDCP_QSEECOM
+	bool "HDCP via QSEECOM"
+	depends on DRM_MSM_DP
+	default n
+
+endmenu
+
+menu "timelm vendor modules (android_kernel_lge_sm8250-modules)"
+
+# These build the out-of-tree vendor drivers as part of the normal kernel
+# "make modules": each directory below techpack/ is a symlink (or a small
+# wrapper with symlinks) into ../android_kernel_lge_sm8250-modules, which must sit next to this tree.  All of them are loadable
+# modules that will live in /vendor/lib/modules once the port is done.
+
+config TIMELM_WLAN
+	tristate "QCA6390 Wi-Fi (cnss2 platform + qcacld-3.0)"
+	depends on m
+	help
+	  cnss2, cnss_utils, wlan_firmware_service, cnss_plat_ipc_qmi_svc,
+	  cnss_prealloc, cnss_nl and qcacld-3.0 (wlan.ko, shipped as
+	  qca_cld3_qca6390.ko).
+
+config TIMELM_BT
+	tristate "QCA6390 Bluetooth power (btpower)"
+	depends on TIMELM_WLAN
+	help
+	  /dev/btpower + BT rfkill.  Uses cnss_utils, hence TIMELM_WLAN.
+
+config TIMELM_CAMERA
+	tristate "Spectra camera (LG 4.19 techpack/camera port)"
+	depends on m
+
+config TIMELM_VIDEO
+	tristate "Venus video (LG 4.19 techpack/video port, msm-vidc)"
+	depends on m
+
+config TIMELM_CVP
+	tristate "CVP (LG 4.19 msm/cvp port, msm-cvp)"
+	depends on m
+
+config TIMELM_DATARMNET
+	tristate "rmnet data over MHI (rmnet_core, rmnet_ctl)"
+	depends on m
+
+config TIMELM_AUDIO
+	tristate "Elite audio (LG 4.19 techpack/audio port, audio_*.ko)"
+	depends on m
+
+config TIMELM_FINGERPRINT
+	tristate "Egis ET713 fingerprint"
+	depends on m
+
+config TIMELM_NFC
+	tristate "Sony CXD22xx NFC"
+	depends on m
+
+config TIMELM_QCE
+	tristate "QTI crypto engine /dev/qce (securemsm crypto-qti)"
+	depends on m
+
+config TIMELM_KGSL
+	tristate "Adreno KGSL (graphics-kernel, msm_kgsl)"
+	depends on m
+
+endmenu

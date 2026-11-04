@@ -1,0 +1,13 @@
+# SPDX-License-Identifier: GPL-2.0-only
+#
+# timelm: QCA6390 Bluetooth power driver (was timelm-bsp/build-bt.sh).
+# bt-kernel/pwr: btpower.ko (/dev/btpower + the BT rfkill) for the vendor HAL
+# (android.hardware.bluetooth@1.0-impl-qti) with /dev/ttyHS0.  It calls
+# cnss_utils_update_device_type(); built in the same modpost pass as
+# techpack/wlan, so no separate build order or KBUILD_EXTRA_SYMBOLS.
+# No btfm SLIMbus / btfmcodec / rtc6226, no BT_HW_SECURE_DISABLE (smcinvoke).
+
+export BT_ROOT := $(realpath $(srctree)/$(src)/bt-kernel)
+export CONFIG_MSM_BT_POWER := m
+
+obj-m += bt-kernel/
