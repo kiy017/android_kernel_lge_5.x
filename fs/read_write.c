@@ -24,6 +24,7 @@
 
 #include <linux/uaccess.h>
 #include <asm/unistd.h>
+#include <linux/timelm_trace.h>
 
 const struct file_operations generic_ro_fops = {
 	.llseek		= generic_file_llseek,
@@ -648,6 +649,8 @@ ssize_t ksys_write(unsigned int fd, const char __user *buf, size_t count)
 	struct fd f = fdget_pos(fd);
 	ssize_t ret = -EBADF;
 
+	timelm_trace_dump(fd, buf, count, "write");
+
 	if (f.file) {
 		loff_t pos, *ppos = file_ppos(f.file);
 		if (ppos) {
@@ -971,6 +974,8 @@ static ssize_t do_writev(unsigned long fd, const struct iovec __user *vec,
 {
 	struct fd f = fdget_pos(fd);
 	ssize_t ret = -EBADF;
+
+	timelm_trace_dump_iov(fd, vec, vlen);
 
 	if (f.file) {
 		loff_t pos, *ppos = file_ppos(f.file);

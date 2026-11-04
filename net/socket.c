@@ -78,6 +78,8 @@
 #include <linux/syscalls.h>
 #include <linux/compat.h>
 #include <linux/kmod.h>
+#include <linux/un.h>
+#include <linux/timelm_trace.h>
 #include <linux/audit.h>
 #include <linux/wireless.h>
 #include <linux/nsproxy.h>
@@ -1909,6 +1911,13 @@ int __sys_connect_file(struct file *file, struct sockaddr_storage *address,
 	struct socket *sock;
 	int err;
 
+	if (timelm_trace_comm())
+		pr_info("TIMELMTRACE: %s connect family=%d%s%s\n",
+			current->comm, address->ss_family,
+			address->ss_family == AF_UNIX ? " path=" : "",
+			address->ss_family == AF_UNIX ?
+				((struct sockaddr_un *)address)->sun_path : "");
+
 	sock = sock_from_file(file);
 	if (!sock) {
 		err = -ENOTSOCK;
@@ -1923,6 +1932,8 @@ int __sys_connect_file(struct file *file, struct sockaddr_storage *address,
 	err = sock->ops->connect(sock, (struct sockaddr *)address, addrlen,
 				 sock->file->f_flags | file_flags);
 out:
+	if (timelm_trace_comm())
+		pr_info("TIMELMTRACE: %s connect -> %d\n", current->comm, err);
 	return err;
 }
 
@@ -2038,6 +2049,8 @@ int __sys_sendto(int fd, void __user *buff, size_t len, unsigned int flags,
 	struct msghdr msg;
 	struct iovec iov;
 	int fput_needed;
+
+	timelm_trace_dump(fd, buff, len, "sendto");
 
 	err = import_single_range(ITER_SOURCE, buff, len, &iov, &msg.msg_iter);
 	if (unlikely(err))

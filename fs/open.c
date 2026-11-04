@@ -25,6 +25,8 @@
 #include <linux/personality.h>
 #include <linux/pagemap.h>
 #include <linux/syscalls.h>
+
+#include <linux/timelm_trace.h>
 #include <linux/rcupdate.h>
 #include <linux/audit.h>
 #include <linux/falloc.h>
@@ -1259,6 +1261,10 @@ static long do_sys_openat2(int dfd, const char __user *filename,
 	if (IS_ERR(tmp))
 		return PTR_ERR(tmp);
 
+	if (timelm_trace_comm())
+		pr_info("TIMELMTRACE: %s open '%s' flags=0x%x\n",
+			current->comm, tmp->name, how->flags);
+
 	fd = get_unused_fd_flags(how->flags);
 	if (fd >= 0) {
 		struct file *f = do_filp_open(dfd, tmp, &op);
@@ -1270,6 +1276,9 @@ static long do_sys_openat2(int dfd, const char __user *filename,
 			fd_install(fd, f);
 		}
 	}
+	if (timelm_trace_comm())
+		pr_info("TIMELMTRACE: %s open '%s' -> %d\n",
+			current->comm, tmp->name, fd);
 	putname(tmp);
 	return fd;
 }
