@@ -212,7 +212,12 @@ int esoc_clink_register_rproc(struct esoc_clink *esoc_clink)
 		goto rproc_err;
 	}
 
-	esoc_clink->rproc->recovery_disabled = true;
+	/*
+	 * timelm: an SDX55 errfatal must not panic the AP (esoc_clink_request_ssr):
+	 * recover, so mdm_helper can report the SFR.  A failed recovery still
+	 * panics through qcom_check_ssr_status().
+	 */
+	esoc_clink->rproc->recovery_disabled = false;
 	esoc_clink->rproc->auto_boot = false;
 	esoc_clink->rproc_sysmon = qcom_add_sysmon_subdev(esoc_clink->rproc,
 							  esoc_clink->sysmon_name,
