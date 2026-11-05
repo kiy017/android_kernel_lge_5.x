@@ -1,0 +1,41 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * timelm: DT fstab entries from the 4.19 kona-timelm_common-storage.dtsi,
+ * same as the stock live DT (v60-live.dts).  All disabled in every 4.19
+ * variant: the ROM fstab does the mounting.
+ */
+
+&firmware {
+	android {
+		fstab {
+			product {
+				compatible = "android,product";
+				dev = "/dev/block/platform/soc/1d84000.ufshc/by-name/product";
+				type = "ext4";
+				mnt_flags = "ro,nodev,barrier=1,errors=continue";
+				fsmgr_flags = "wait,slotselect,avb";
+				status = "disabled";
+			};
+
+			OP {
+				compatible = "android,op";
+				dev = "/dev/block/platform/soc/1d84000.ufshc/by-name/OP";
+				type = "ext4";
+				mnt_point = "/mnt/product/OP";
+				mnt_flags = "ro,noatime,nosuid,nodev,barrier=1,data=ordered,noauto_da_alloc";
+				fsmgr_flags = "wait,slotselect,avb,nofail";
+				status = "disabled";
+			};
+
+			drm {
+				compatible = "android,drm";
+				dev = "/dev/block/platform/soc/1d84000.ufshc/by-name/drm";
+				type = "ext4";
+				mnt_point = "/mnt/vendor/persist-lg";
+				mnt_flags = "noatime,nosuid,nodev,barrier=1,data=ordered,noauto_da_alloc,errors=continue";
+				fsmgr_flags = "wait,formattable";
+				status = "disabled";
+			};
+		};
+	};
+};
