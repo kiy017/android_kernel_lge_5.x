@@ -415,6 +415,8 @@ source "drivers/s390/char/Kconfig"
 
 source "drivers/char/xillybus/Kconfig"
 
+source "drivers/char/diag/Kconfig"
+
 config MSM_ADSPRPC
 	tristate "QTI FastRPC driver"
 	depends on RPMSG && QCOM_SECURE_BUFFER && PM_SLEEP && HAS_DMA && CMA && MMU
