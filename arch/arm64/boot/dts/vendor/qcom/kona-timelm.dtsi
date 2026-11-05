@@ -29,19 +29,12 @@
 #include "kona-timelm-camera.dtsi"
 /* Egis ET713 fingerprint (LG kona-timelm_common-fingerprint.dtsi) */
 #include "kona-timelm-fingerprint.dtsi"
-/* Sony CXD2252 NFC (stock cxd22xx-i2c@28 on qupv3_se1_i2c) */
-#include "kona-timelm-nfc.dtsi"
 #include "video/kona-vidc-lge.dtsi"
 #include "video/kona-cvp-lge.dtsi"
 /* Board thermistors (skin/quiet/QTM) + HAL-facing thermal zones */
 #include "kona-timelm-thermal.dtsi"
+#include "kona-timelm_common-storage.dtsi"
 
 / {
-	model = "LG V60 ThinQ 5G (timelm)";
-	compatible = "qcom,kona", "lg,timelm";
-
-	qcom,board-id = <0x03000008 0>, <0x030C0008 0>, <0x03060008 0>,
-			<0x03070008 0>, <0x03070108 0>, <0x03070208 0>,
-			<0x03080008 0>;
 	qcom,msm-id = <356 0x20001>;
 };
