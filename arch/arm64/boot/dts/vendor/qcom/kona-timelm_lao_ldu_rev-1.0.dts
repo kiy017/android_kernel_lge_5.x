@@ -1,0 +1,14 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * LG V60 ThinQ 5G (timelm) lao_ldu rev 1.0, 4.19 CONFIG_MACH_KONA_TIMELM_LAO_LDU.
+ * Separate from kona-timelm_lao_ldu.dts: this rev keeps the modem enabled.
+ */
+
+/dts-v1/;
+#include "kona-timelm.dtsi"
+
+/ {
+	model = "LG Electronics, Timelm_lao, rev_1.0";
+	compatible = "qcom,kona", "lg,timelm";
+	qcom,board-id = <0x000C0008 0>;
+};
