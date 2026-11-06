@@ -44,20 +44,11 @@
 };
 
 /*
- * The SSC firmware on this device raises a fatal/watchdog error when a
- * sensor PD exceeds its processing time limit.  kona-slpi-pas is built with
- * rproc->recovery_disabled, so the q6v5 crash handler would otherwise call
- * panic() and reboot the phone.  Keep the AP alive instead so the failure is
- * observable (logcat/ramoops) and the rest of the system can boot.
- *
- * img53: with the SLPI left offline every ISensors activate times out after
- * 8 s and screen wake stalls system_server for ~14 s (frozen screen).  The
- * vendor init only knows the 4.19 /sys/bus/msm_subsys SSR knobs, so enable
- * remoteproc recovery for the SLPI from the DT (qcom_q6v5_pas.c).
+ * Restart a crashed SLPI instead of panicking the AP (qcom_q6v5_pas.c).  It
+ * still crashes on boot (SEE processing time limit) and comes back in ~200 ms.
  */
 &slpi_pas {
-	qcom,no-panic-on-crash;
-	qcom,timelm-recovery;
+	qcom,recovery-enabled;
 };
 
 /*
@@ -809,14 +800,9 @@
  * qcom,adsp-notify node the 5.15 audio_notifier binds to.  Codec/LPI/sound
  * children of q6core come in later stages.
  */
-/*
- * Bring-up: an ADSP fatal error must not panic the AP (qcom_q6v5.c
- * no_panic_on_crash, img44) or a crash on first boot of the new audio stack
- * becomes a boot loop.  Recovery stays disabled, so the ADSP stays offline
- * and the crash reason is in dmesg.  Revisit once audio is stable.
- */
+/* Restart a crashed ADSP instead of panicking the AP (qcom_q6v5_pas.c). */
 &adsp_pas {
-	qcom,no-panic-on-crash;
+	qcom,recovery-enabled;
 };
 
 &soc {
