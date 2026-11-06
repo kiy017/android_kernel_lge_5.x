@@ -769,8 +769,17 @@ static int qrtr_node_enqueue(struct qrtr_node *node, struct sk_buff *skb,
 	size_t len = skb->len;
 	int rc, confirm_rx;
 
+	/* DEBUG(timelm): with TX-DONE below, shows a sender blocked on flow control */
+	if (node->nid == 2 || node->nid == 3)
+		timelm_qrtrlog("TX type=%d %u:%x -> %u:%x node=%u size=%zu\n", type,
+			       from->sq_node, from->sq_port, to->sq_node,
+			       to->sq_port, node->nid, len);
+
 	mutex_lock(&node->ep_lock);
 	if (!atomic_read(&node->hello_sent) && type != QRTR_TYPE_HELLO) {
+		if (node->nid == 2 || node->nid == 3)
+			timelm_qrtrlog("TX-DROP no hello yet, type=%d node=%u\n",
+				       type, node->nid);
 		kfree_skb(skb);
 		mutex_unlock(&node->ep_lock);
 		return 0;
@@ -838,6 +847,9 @@ static int qrtr_node_enqueue(struct qrtr_node *node, struct sk_buff *skb,
 	}
 	/* Need to ensure that a subsequent message carries the otherwise lost
 	 * confirm_rx flag if we dropped this one */
+	if (node->nid == 2 || node->nid == 3)
+		timelm_qrtrlog("TX-DONE type=%d -> %u:%x rc=%d confirm=%d\n", type,
+			       to->sq_node, to->sq_port, rc, confirm_rx);
 	if (rc && confirm_rx)
 		qrtr_tx_flow_failed(node, to->sq_node, to->sq_port);
 	if (rc && type == QRTR_TYPE_HELLO) {
@@ -1084,6 +1096,25 @@ int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len)
 	if (!size || size > len || len != ALIGN(size, 4) + hdrlen)
 		goto err;
 
+	/* DEBUG(timelm): everything from the SDX55 side, as it comes off MHI */
+	if (cb->src_node == 2 || cb->src_node == 3) {
+		const struct qrtr_ctrl_pkt *tpkt = data + hdrlen;
+
+		if ((cb->type == QRTR_TYPE_NEW_SERVER ||
+		     cb->type == QRTR_TYPE_DEL_SERVER) && size >= sizeof(*tpkt))
+			timelm_qrtrlog("EP type=%u %u:%x svc=%u inst=%u at %u:%u\n",
+				       cb->type, cb->src_node, cb->src_port,
+				       le32_to_cpu(tpkt->server.service),
+				       le32_to_cpu(tpkt->server.instance),
+				       le32_to_cpu(tpkt->server.node),
+				       le32_to_cpu(tpkt->server.port));
+		else
+			timelm_qrtrlog("EP type=%u %u:%x -> %u:%x size=%zu confirm=%u\n",
+				       cb->type, cb->src_node, cb->src_port,
+				       cb->dst_node, cb->dst_port, size,
+				       cb->confirm_rx);
+	}
+
 	if ((cb->type == QRTR_TYPE_NEW_SERVER ||
 	     cb->type == QRTR_TYPE_RESUME_TX) &&
 	    size < sizeof(struct qrtr_ctrl_pkt))
@@ -1119,11 +1150,15 @@ int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len)
 	} else {
 		ipc = qrtr_port_lookup(cb->dst_port);
 		if (!ipc) {
+			timelm_qrtrlog("EP-NOPORT %u:%x -> port %x\n", cb->src_node,
+				       cb->src_port, cb->dst_port);
 			kfree_skb(skb);
 			return -ENODEV;
 		}
 
 		if (sock_queue_rcv_skb(&ipc->sk, skb)) {
+			timelm_qrtrlog("EP-QFULL %u:%x -> port %x\n", cb->src_node,
+				       cb->src_port, cb->dst_port);
 			qrtr_port_put(ipc);
 			goto err;
 		}
@@ -1138,6 +1173,7 @@ int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len)
 	return 0;
 
 err:
+	timelm_qrtrlog("EP-ERR ver=%u len=%zu\n", ver, len);
 	kfree_skb(skb);
 	return -EINVAL;
 
@@ -1365,6 +1401,8 @@ static void qrtr_hello_work(struct kthread_work *work)
 	}
 
 	node = container_of(work, struct qrtr_node, say_hello);
+	timelm_qrtrlog("HELLO-WORK nid=%d sent=%d\n", node->nid,
+		       atomic_read(&node->hello_sent));
 	pkt->cmd = cpu_to_le32(QRTR_TYPE_HELLO);
 	from.sq_node = qrtr_local_nid;
 	to.sq_node = node->nid;
@@ -1388,6 +1426,8 @@ static void timelm_hello_fallback_work(struct kthread_work *work)
 	struct qrtr_node *node = container_of(work, struct qrtr_node,
 					      timelm_say_hello.work);
 
+	timelm_qrtrlog("HELLO-FALLBACK nid=%d sent=%d\n", node->nid,
+		       atomic_read(&node->hello_sent));
 	qrtr_hello_work(&node->say_hello);
 }
 #endif
@@ -1460,6 +1500,7 @@ int qrtr_endpoint_register(struct qrtr_endpoint *ep, unsigned int net_id,
 	 * answers theirs.
 	 */
 	if (ep->timelm_hold_hello) {
+		timelm_qrtrlog("HELLO-HOLD\n");
 #ifdef DEBUG_LGE_MODEM_HOLD
 		kthread_queue_delayed_work(&node->kworker, &node->timelm_say_hello,
 					   msecs_to_jiffies(10000));

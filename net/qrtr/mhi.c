@@ -29,6 +29,10 @@ static void qcom_mhi_qrtr_dl_callback(struct mhi_device *mhi_dev,
 	struct qrtr_mhi_dev *qdev = dev_get_drvdata(&mhi_dev->dev);
 	int rc;
 
+	/* DEBUG(timelm) */
+	if (mhi_res->transaction_status)
+		timelm_qrtrlog("MHI-DL status=%d len=%zu\n",
+			       mhi_res->transaction_status, mhi_res->bytes_xferd);
 	if (!qdev || mhi_res->transaction_status)
 		return;
 
