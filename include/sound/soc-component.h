@@ -43,6 +43,10 @@ struct snd_compress_ops {
 	int (*get_metadata)(struct snd_soc_component *component,
 			    struct snd_compr_stream *stream,
 			    struct snd_compr_metadata *metadata);
+	/* timelm: QC 4.19 ABI */
+	int (*set_next_track_param)(struct snd_soc_component *component,
+				    struct snd_compr_stream *stream,
+				    union snd_codec_options *codec_options);
 	int (*trigger)(struct snd_soc_component *component,
 		       struct snd_compr_stream *stream, int cmd);
 	int (*pointer)(struct snd_soc_component *component,
