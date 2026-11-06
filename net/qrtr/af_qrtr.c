@@ -21,6 +21,9 @@
 #include <uapi/linux/sched/types.h>
 
 #include "qrtr.h"
+
+/* timelm: send our hello anyway if the remote never says hello first */
+#define DEBUG_LGE_MODEM_HOLD
 #if IS_ENABLED(CONFIG_QRTR_BPF_FILTER)
 #include "bpf_service.h"
 #endif
@@ -188,6 +191,9 @@ struct qrtr_node {
 	struct task_struct *task;
 	struct kthread_work read_data;
 	struct kthread_work say_hello;
+#ifdef DEBUG_LGE_MODEM_HOLD
+	struct kthread_delayed_work timelm_say_hello;
+#endif
 
 	struct wakeup_source *ws;
 	void *ilc;
@@ -1376,6 +1382,16 @@ static void qrtr_hello_work(struct kthread_work *work)
  *
  * The specified endpoint must have the xmit function pointer set on call.
  */
+#ifdef DEBUG_LGE_MODEM_HOLD
+static void timelm_hello_fallback_work(struct kthread_work *work)
+{
+	struct qrtr_node *node = container_of(work, struct qrtr_node,
+					      timelm_say_hello.work);
+
+	qrtr_hello_work(&node->say_hello);
+}
+#endif
+
 int qrtr_endpoint_register(struct qrtr_endpoint *ep, unsigned int net_id,
 			   bool rt, struct qrtr_array *no_wake)
 {
@@ -1401,6 +1417,10 @@ int qrtr_endpoint_register(struct qrtr_endpoint *ep, unsigned int net_id,
 
 	kthread_init_work(&node->read_data, qrtr_node_rx_work);
 	kthread_init_work(&node->say_hello, qrtr_hello_work);
+#ifdef DEBUG_LGE_MODEM_HOLD
+	kthread_init_delayed_work(&node->timelm_say_hello,
+				  timelm_hello_fallback_work);
+#endif
 	kthread_init_worker(&node->kworker);
 	node->task = kthread_run(kthread_worker_fn, &node->kworker, "qrtr_rx");
 	if (IS_ERR(node->task)) {
@@ -1433,6 +1453,19 @@ int qrtr_endpoint_register(struct qrtr_endpoint *ep, unsigned int net_id,
 	ep->node = node;
 
 	node->ws = wakeup_source_register(NULL, "qrtr_ws");
+
+	/*
+	 * timelm: the SDX55 stops announcing servers if our hello reaches it
+	 * before its own goes out. Hold ours: the nameservice sends it when it
+	 * answers theirs.
+	 */
+	if (ep->timelm_hold_hello) {
+#ifdef DEBUG_LGE_MODEM_HOLD
+		kthread_queue_delayed_work(&node->kworker, &node->timelm_say_hello,
+					   msecs_to_jiffies(10000));
+#endif
+		return 0;
+	}
 
 	kthread_queue_work(&node->kworker, &node->say_hello);
 	return 0;
@@ -1510,6 +1543,10 @@ void qrtr_endpoint_unregister(struct qrtr_endpoint *ep)
 	struct sk_buff *skb;
 	unsigned long flags;
 	void __rcu **slot;
+
+#ifdef DEBUG_LGE_MODEM_HOLD
+	kthread_cancel_delayed_work_sync(&node->timelm_say_hello);
+#endif
 
 	mutex_lock(&node->ep_lock);
 	node->ep = NULL;
