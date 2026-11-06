@@ -122,6 +122,10 @@ struct snd_soc_component_driver {
 	int (*ioctl)(struct snd_soc_component *component,
 		     struct snd_pcm_substream *substream,
 		     unsigned int cmd, void *arg);
+	/* timelm: QC 4.19, see snd_pcm_ops.compat_ioctl */
+	int (*compat_ioctl)(struct snd_soc_component *component,
+			    struct snd_pcm_substream *substream,
+			    unsigned int cmd, void *arg);
 	int (*hw_params)(struct snd_soc_component *component,
 			 struct snd_pcm_substream *substream,
 			 struct snd_pcm_hw_params *params);
@@ -484,6 +488,8 @@ int snd_soc_component_compr_get_metadata(struct snd_compr_stream *cstream,
 int snd_soc_pcm_component_pointer(struct snd_pcm_substream *substream);
 int snd_soc_pcm_component_ioctl(struct snd_pcm_substream *substream,
 				unsigned int cmd, void *arg);
+int snd_soc_pcm_component_compat_ioctl(struct snd_pcm_substream *substream,
+				       unsigned int cmd, void *arg);
 int snd_soc_pcm_component_sync_stop(struct snd_pcm_substream *substream);
 int snd_soc_pcm_component_copy_user(struct snd_pcm_substream *substream,
 				    int channel, unsigned long pos,
