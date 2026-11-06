@@ -474,11 +474,33 @@ static int soc_compr_get_metadata(struct snd_compr_stream *cstream,
 	return snd_soc_component_compr_get_metadata(cstream, metadata);
 }
 
+/* timelm: QC 4.19 ABI, used by the Elite compress driver for gapless */
+static int soc_compr_set_next_track_param(struct snd_compr_stream *cstream,
+					  union snd_codec_options *codec_options)
+{
+	struct snd_soc_pcm_runtime *rtd = cstream->private_data;
+	struct snd_soc_component *component;
+	int i, ret;
+
+	for_each_rtd_components(rtd, i, component) {
+		if (component->driver->compress_ops &&
+		    component->driver->compress_ops->set_next_track_param) {
+			ret = component->driver->compress_ops->set_next_track_param(
+				component, cstream, codec_options);
+			if (ret < 0)
+				return ret;
+		}
+	}
+
+	return 0;
+}
+
 /* ASoC Compress operations */
 static struct snd_compr_ops soc_compr_ops = {
 	.open		= soc_compr_open,
 	.free		= soc_compr_free,
 	.set_params	= soc_compr_set_params,
+	.set_next_track_param = soc_compr_set_next_track_param,
 	.set_metadata   = soc_compr_set_metadata,
 	.get_metadata	= soc_compr_get_metadata,
 	.get_params	= soc_compr_get_params,
@@ -495,6 +517,7 @@ static struct snd_compr_ops soc_compr_dyn_ops = {
 	.free		= soc_compr_free_fe,
 	.set_params	= soc_compr_set_params_fe,
 	.get_params	= soc_compr_get_params,
+	.set_next_track_param = soc_compr_set_next_track_param,
 	.set_metadata   = soc_compr_set_metadata,
 	.get_metadata	= soc_compr_get_metadata,
 	.trigger	= soc_compr_trigger_fe,
@@ -631,6 +654,16 @@ int snd_soc_new_compress(struct snd_soc_pcm_runtime *rtd, int num)
 
 	rtd->compr = compr;
 	compr->private_data = rtd;
+
+	/*
+	 * timelm: 4.19 ran the components' pcm_new for compress FEs too; the Elite
+	 * driver adds its "Compress Playback N Volume" etc. controls there.
+	 */
+	if (rtd->dai_link->dynamic) {
+		ret = snd_soc_pcm_component_new(rtd);
+		if (ret < 0)
+			return ret;
+	}
 
 	dev_dbg(rtd->card->dev, "Compress ASoC: %s <-> %s mapping ok\n",
 		codec_dai->name, cpu_dai->name);
