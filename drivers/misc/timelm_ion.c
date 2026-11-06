@@ -18,8 +18,11 @@
  *		      4  u32 fd		(out)		ioctl 0xc0084904 (nr 4)
  *	free/probe:   0  u32 handle			ioctl 0xc0044901 (nr 1)
  *
- * (LG's own 4.19 uapi is the shorter fd-in-struct variant, <name>.bNN style
- * ioctl is not used here; it is still accepted below for completeness.)
+ * The stock 4.19 kernel only has the fd-in-struct ALLOC (24 bytes) and
+ * HEAP_QUERY, so libion runs in its modern mode there.  ion_is_legacy() sees
+ * FREE succeed here, so libion and the vendor libs use the legacy calls.  Both
+ * are accepted.  There is no ION_IOC_CUSTOM in either: cache maintenance is
+ * DMA_BUF_IOCTL_SYNC on the dma-buf fd.
  *
  * The heap mask matters: the vendor libs ask for ION_QSECOM_HEAP (bit 27,
  * ION_QSECOM_HEAP_ID = 27 in include/uapi/linux/msm_ion.h), i.e. physically
@@ -49,13 +52,14 @@
 #include <linux/dma-heap.h>
 #include <linux/xarray.h>
 
-#define IONDBG_IOC_ALLOC		0
-#define IONDBG_IOC_FREE			1
-#define IONDBG_IOC_MAP			2
-#define IONDBG_IOC_SHARE		4	/* 0xc0084904 in the ROM's libion */
-#define IONDBG_IOC_IMPORT		5
-#define IONDBG_IOC_SYNC			7
-#define IONDBG_IOC_HEAP_QUERY		8
+#define ION_IOC_MAGIC			'I'
+#define TIMELM_ION_NR_ALLOC		0
+#define TIMELM_ION_NR_FREE			1
+#define TIMELM_ION_NR_MAP			2
+#define TIMELM_ION_NR_SHARE		4	/* 0xc0084904 in the ROM's libion */
+#define TIMELM_ION_NR_IMPORT		5
+#define TIMELM_ION_NR_SYNC			7
+#define TIMELM_ION_NR_HEAP_QUERY		8
 
 /* include/uapi/linux/msm_ion.h of the 4.19 LG kernel */
 #define ION_QSECOM_TA_HEAP_BIT		(1u << 19)
@@ -123,16 +127,16 @@ struct ion_heap_query {
 	__u32 reserved2;
 };
 
-enum ion_dbg_heap_id {
-	ION_DBG_HEAP_QSECOM,
-	ION_DBG_HEAP_QSECOM_TA,
-	ION_DBG_HEAP_USER_CONTIG,
-	ION_DBG_HEAP_SYSTEM,
-	ION_DBG_HEAP_SYSTEM_UNCACHED,
-	ION_DBG_HEAP_MAX,
+enum timelm_ion_heap_id {
+	TIMELM_ION_HEAP_QSECOM,
+	TIMELM_ION_HEAP_QSECOM_TA,
+	TIMELM_ION_HEAP_USER_CONTIG,
+	TIMELM_ION_HEAP_SYSTEM,
+	TIMELM_ION_HEAP_SYSTEM_UNCACHED,
+	TIMELM_ION_HEAP_MAX,
 };
 
-static const char *const ion_dbg_heap_names[ION_DBG_HEAP_MAX] = {
+static const char *const timelm_ion_heap_names[TIMELM_ION_HEAP_MAX] = {
 	"qcom,qseecom",
 	"qcom,qseecom-ta",
 	"qcom,user-contig",
@@ -140,8 +144,7 @@ static const char *const ion_dbg_heap_names[ION_DBG_HEAP_MAX] = {
 	"system-uncached",
 };
 
-static struct dma_heap *ion_dbg_heaps[ION_DBG_HEAP_MAX];
-static int ion_dbg_nr_alloc;
+static struct dma_heap *timelm_ion_heaps[TIMELM_ION_HEAP_MAX];
 
 /*
  * Legacy ION handles are per-/dev/ion-open ids, not fds: ION_IOC_SHARE/MAP
@@ -152,18 +155,18 @@ static int ion_dbg_nr_alloc;
  * blew up in hidl_handle: system_server "Failed to clone native_handle in
  * hidl_handle: Bad file descriptor" -> zygote restart, audio HAL killed.
  */
-struct ion_dbg_client {
+struct timelm_ion_client {
 	struct xarray handles;		/* handle id -> struct dma_buf * (own ref) */
 };
 
-static int ion_dbg_new_handle(struct ion_dbg_client *c, struct dma_buf *dmabuf,
+static int timelm_ion_new_handle(struct timelm_ion_client *c, struct dma_buf *dmabuf,
 			      u32 *handle)
 {
 	return xa_alloc(&c->handles, handle, dmabuf, xa_limit_31b, GFP_KERNEL);
 }
 
 /* new fd for a handle; the fd owns its own dma_buf ref */
-static int ion_dbg_handle_to_fd(struct ion_dbg_client *c, u32 handle)
+static int timelm_ion_handle_to_fd(struct timelm_ion_client *c, u32 handle)
 {
 	struct dma_buf *dmabuf;
 	int fd;
@@ -181,22 +184,22 @@ static int ion_dbg_handle_to_fd(struct ion_dbg_client *c, u32 handle)
 		dma_buf_put(dmabuf);
 	return fd;
 }
-static int ion_dbg_logged;
+static int timelm_ion_logged;
 
 /*
  * drivers/misc is linked before drivers/dma-buf, so no heap can be looked up at
  * initcall time (system_heap_create()/the qcom dma-heap probe are later).  All
  * lookups are lazy, on first use, and the result is cached.
  */
-static struct dma_heap *ion_dbg_get_heap(enum ion_dbg_heap_id id)
+static struct dma_heap *timelm_ion_get_heap(enum timelm_ion_heap_id id)
 {
-	if (ion_dbg_heaps[id])
-		return ion_dbg_heaps[id];
+	if (timelm_ion_heaps[id])
+		return timelm_ion_heaps[id];
 
-	ion_dbg_heaps[id] = dma_heap_find(ion_dbg_heap_names[id]);
-	if (ion_dbg_heaps[id])
-		pr_info("IONDBG: dma-heap %s found\n", ion_dbg_heap_names[id]);
-	return ion_dbg_heaps[id];
+	timelm_ion_heaps[id] = dma_heap_find(timelm_ion_heap_names[id]);
+	if (timelm_ion_heaps[id])
+		pr_info("IONDBG: dma-heap %s found\n", timelm_ion_heap_names[id]);
+	return timelm_ion_heaps[id];
 }
 
 /*
@@ -207,27 +210,27 @@ static struct dma_heap *ion_dbg_get_heap(enum ion_dbg_heap_id id)
  * writes (glyph atlases, decoded bitmaps) stay in the CPU cache and the GPU
  * samples stale DRAM (img48: missing glyphs, black tiles in the wallpaper).
  */
-static enum ion_dbg_heap_id ion_dbg_heap_for_mask(u32 mask, u32 flags)
+static enum timelm_ion_heap_id timelm_ion_heap_for_mask(u32 mask, u32 flags)
 {
 	if (mask & ION_QSECOM_HEAP_BIT)
-		return ION_DBG_HEAP_QSECOM;
+		return TIMELM_ION_HEAP_QSECOM;
 	if (mask & ION_QSECOM_TA_HEAP_BIT)
-		return ION_DBG_HEAP_QSECOM_TA;
+		return TIMELM_ION_HEAP_QSECOM_TA;
 	if (mask & ION_USER_CONTIG_HEAP_BIT)
-		return ION_DBG_HEAP_USER_CONTIG;
+		return TIMELM_ION_HEAP_USER_CONTIG;
 	if (!(flags & ION_FLAG_CACHED))
-		return ION_DBG_HEAP_SYSTEM_UNCACHED;
-	return ION_DBG_HEAP_SYSTEM;
+		return TIMELM_ION_HEAP_SYSTEM_UNCACHED;
+	return TIMELM_ION_HEAP_SYSTEM;
 }
 
-static int ion_dbg_alloc(struct ion_dbg_client *c, unsigned long arg,
+static int timelm_ion_alloc(struct timelm_ion_client *c, unsigned long arg,
 			 unsigned int size)
 {
 	struct ion_allocation_data data = { 0 };
 	struct ion_allocation_data_fd data_fd = { 0 };
 	struct ion_allocation_data32 data32 = { 0 };
 	struct dma_heap *heap;
-	enum ion_dbg_heap_id id;
+	enum timelm_ion_heap_id id;
 	u64 len;
 	u32 mask, flags, handle;
 	struct dma_buf *dmabuf;
@@ -258,13 +261,13 @@ static int ion_dbg_alloc(struct ion_dbg_client *c, unsigned long arg,
 		return -EINVAL;
 	}
 
-	id = ion_dbg_heap_for_mask(mask, flags);
-	heap = ion_dbg_get_heap(id);
-	if (!heap && id != ION_DBG_HEAP_SYSTEM) {
+	id = timelm_ion_heap_for_mask(mask, flags);
+	heap = timelm_ion_get_heap(id);
+	if (!heap && id != TIMELM_ION_HEAP_SYSTEM) {
 		pr_info("IONDBG: heap %s missing, falling back to system\n",
-			ion_dbg_heap_names[id]);
-		id = ION_DBG_HEAP_SYSTEM;
-		heap = ion_dbg_get_heap(id);
+			timelm_ion_heap_names[id]);
+		id = TIMELM_ION_HEAP_SYSTEM;
+		heap = timelm_ion_get_heap(id);
 	}
 	if (!heap) {
 		pr_info("IONDBG: no dma-heap at all for mask 0x%x\n", mask);
@@ -273,22 +276,23 @@ static int ion_dbg_alloc(struct ion_dbg_client *c, unsigned long arg,
 
 	pr_info("IONDBG: ALLOC len=%llu mask=0x%x flags=0x%x size=%u heap=%s\n",
 		(unsigned long long)len, mask, flags, size,
-		ion_dbg_heap_names[id]);
+		timelm_ion_heap_names[id]);
 
 	/* LG's own 24 byte layout is the fd-in-struct ABI: no handle at all */
 	if (size < sizeof(data) && size != sizeof(data32)) {
 		fd = dma_heap_bufferfd_alloc(heap, len, O_RDWR | O_CLOEXEC, 0);
 		if (fd < 0) {
 			pr_info("IONDBG: ALLOC len=%llu heap=%s failed ret=%d\n",
-				(unsigned long long)len, ion_dbg_heap_names[id],
+				(unsigned long long)len, timelm_ion_heap_names[id],
 				fd);
 			return fd;
 		}
-		if (put_user((u32)fd, (u32 __user *)(arg + 16)))
+		if (put_user((u32)fd, (u32 __user *)(arg + 16))) {
+			close_fd(fd);
 			return -EFAULT;
+		}
 		pr_info("IONDBG: ALLOC len=%llu -> fd %d (heap %s)\n",
-			(unsigned long long)len, fd, ion_dbg_heap_names[id]);
-		ion_dbg_nr_alloc++;
+			(unsigned long long)len, fd, timelm_ion_heap_names[id]);
 		return 0;
 	}
 
@@ -296,11 +300,11 @@ static int ion_dbg_alloc(struct ion_dbg_client *c, unsigned long arg,
 	dmabuf = dma_heap_buffer_alloc(heap, len, O_RDWR | O_CLOEXEC, 0);
 	if (IS_ERR(dmabuf)) {
 		pr_info("IONDBG: ALLOC len=%llu heap=%s failed ret=%ld\n",
-			(unsigned long long)len, ion_dbg_heap_names[id],
+			(unsigned long long)len, timelm_ion_heap_names[id],
 			PTR_ERR(dmabuf));
 		return PTR_ERR(dmabuf);
 	}
-	ret = ion_dbg_new_handle(c, dmabuf, &handle);
+	ret = timelm_ion_new_handle(c, dmabuf, &handle);
 	if (ret) {
 		dma_buf_put(dmabuf);
 		return ret;
@@ -313,13 +317,12 @@ static int ion_dbg_alloc(struct ion_dbg_client *c, unsigned long arg,
 	}
 
 	pr_info("IONDBG: ALLOC len=%llu -> handle %u (heap %s)\n",
-		(unsigned long long)len, handle, ion_dbg_heap_names[id]);
-	ion_dbg_nr_alloc++;
+		(unsigned long long)len, handle, timelm_ion_heap_names[id]);
 	return 0;
 }
 
 /* ION_IOC_SHARE / ION_IOC_MAP: handle -> a new dma-buf fd */
-static int ion_dbg_share(struct ion_dbg_client *c, unsigned long arg,
+static int timelm_ion_share(struct timelm_ion_client *c, unsigned long arg,
 			 unsigned int size)
 {
 	struct ion_fd_data data;
@@ -330,7 +333,7 @@ static int ion_dbg_share(struct ion_dbg_client *c, unsigned long arg,
 	if (copy_from_user(&data, (void __user *)arg, sizeof(data)))
 		return -EFAULT;
 
-	fd = ion_dbg_handle_to_fd(c, data.handle);
+	fd = timelm_ion_handle_to_fd(c, data.handle);
 	if (fd < 0) {
 		pr_info("IONDBG: SHARE bad handle %u (%d)\n", data.handle, fd);
 		return fd;
@@ -344,7 +347,7 @@ static int ion_dbg_share(struct ion_dbg_client *c, unsigned long arg,
 }
 
 /* ION_IOC_IMPORT: dma-buf fd -> new handle (holding its own ref) */
-static int ion_dbg_import(struct ion_dbg_client *c, unsigned long arg,
+static int timelm_ion_import(struct timelm_ion_client *c, unsigned long arg,
 			  unsigned int size)
 {
 	struct ion_fd_data data;
@@ -358,11 +361,11 @@ static int ion_dbg_import(struct ion_dbg_client *c, unsigned long arg,
 		return -EFAULT;
 
 	dmabuf = dma_buf_get(data.fd);
-	if (IS_ERR_OR_NULL(dmabuf)) {
+	if (IS_ERR(dmabuf)) {
 		pr_info("IONDBG: IMPORT bad fd %u\n", data.fd);
 		return -EINVAL;
 	}
-	ret = ion_dbg_new_handle(c, dmabuf, &handle);
+	ret = timelm_ion_new_handle(c, dmabuf, &handle);
 	if (ret) {
 		dma_buf_put(dmabuf);
 		return ret;
@@ -376,7 +379,7 @@ static int ion_dbg_import(struct ion_dbg_client *c, unsigned long arg,
 }
 
 /* ION_IOC_FREE: { ion_user_handle_t handle; } */
-static int ion_dbg_free(struct ion_dbg_client *c, unsigned long arg)
+static int timelm_ion_free(struct timelm_ion_client *c, unsigned long arg)
 {
 	struct dma_buf *dmabuf;
 	u32 handle;
@@ -394,7 +397,7 @@ static int ion_dbg_free(struct ion_dbg_client *c, unsigned long arg)
 }
 
 /* ION_IOC_SYNC: legacy "flush CPU writes for the device" on a dma-buf fd */
-static int ion_dbg_sync(unsigned long arg, unsigned int size)
+static int timelm_ion_sync(unsigned long arg, unsigned int size)
 {
 	struct ion_fd_data data;
 	struct dma_buf *dmabuf;
@@ -406,18 +409,18 @@ static int ion_dbg_sync(unsigned long arg, unsigned int size)
 		return -EFAULT;
 
 	dmabuf = dma_buf_get(data.fd);
-	if (IS_ERR_OR_NULL(dmabuf))
+	if (IS_ERR(dmabuf))
 		return -EINVAL;
 	ret = dma_buf_end_cpu_access(dmabuf, DMA_BIDIRECTIONAL);
 	dma_buf_put(dmabuf);
 	return ret;
 }
 
-static int ion_dbg_heap_query(unsigned long arg)
+static int timelm_ion_heap_query(unsigned long arg)
 {
 	struct ion_heap_query q;
 	struct ion_heap_data hd = { 0 };
-	struct dma_heap *heap = ion_dbg_get_heap(ION_DBG_HEAP_SYSTEM);
+	struct dma_heap *heap = timelm_ion_get_heap(TIMELM_ION_HEAP_SYSTEM);
 	int ret = 0;
 
 	if (copy_from_user(&q, (void __user *)arg, sizeof(q)))
@@ -434,49 +437,55 @@ static int ion_dbg_heap_query(unsigned long arg)
 	return ret;
 }
 
-static long ion_dbg_ion_ioctl(struct file *file, unsigned int cmd,
+static long timelm_ion_ioctl(struct file *file, unsigned int cmd,
 			      unsigned long arg)
 {
-	struct ion_dbg_client *c = file->private_data;
+	struct timelm_ion_client *c = file->private_data;
 	unsigned int nr = _IOC_NR(cmd), size = _IOC_SIZE(cmd);
 	int ret;
 
-	if (ion_dbg_logged++ < 40)
+	if (timelm_ion_logged++ < 40)
 		pr_info("IONDBG: ioctl nr=%u size=%u cmd=0x%x comm=%s pid=%d\n",
 			nr, size, cmd, current->comm, task_pid_nr(current));
 
+	if (_IOC_TYPE(cmd) != ION_IOC_MAGIC) {
+		pr_info("IONDBG: unhandled ioctl cmd=0x%x -> -ENOTTY\n", cmd);
+		return -ENOTTY;
+	}
+
 	switch (nr) {
-	case IONDBG_IOC_ALLOC:
-		ret = ion_dbg_alloc(c, arg, size);
+	case TIMELM_ION_NR_ALLOC:
+		ret = timelm_ion_alloc(c, arg, size);
 		break;
-	case IONDBG_IOC_FREE:
-		ret = ion_dbg_free(c, arg);
+	case TIMELM_ION_NR_FREE:
+		ret = timelm_ion_free(c, arg);
 		break;
-	case IONDBG_IOC_MAP:
-	case IONDBG_IOC_SHARE:
-		ret = ion_dbg_share(c, arg, size);
+	case TIMELM_ION_NR_MAP:
+	case TIMELM_ION_NR_SHARE:
+		ret = timelm_ion_share(c, arg, size);
 		break;
-	case IONDBG_IOC_IMPORT:
-		ret = ion_dbg_import(c, arg, size);
+	case TIMELM_ION_NR_IMPORT:
+		ret = timelm_ion_import(c, arg, size);
 		break;
-	case IONDBG_IOC_SYNC:
-		ret = ion_dbg_sync(arg, size);
+	case TIMELM_ION_NR_SYNC:
+		ret = timelm_ion_sync(arg, size);
 		break;
-	case IONDBG_IOC_HEAP_QUERY:
-		ret = ion_dbg_heap_query(arg);
+	case TIMELM_ION_NR_HEAP_QUERY:
+		ret = timelm_ion_heap_query(arg);
 		break;
 	default:
-		pr_info("IONDBG: unhandled ioctl nr=%u size=%u -> success\n",
+		/* 4.19 has no ION_IOC_CUSTOM; cache ops are DMA_BUF_IOCTL_SYNC */
+		pr_info("IONDBG: unhandled ioctl nr=%u size=%u -> -ENOTTY\n",
 			nr, size);
-		ret = 0;
+		ret = -ENOTTY;
 		break;
 	}
 	return ret;
 }
 
-static int ion_dbg_open(struct inode *inode, struct file *file)
+static int timelm_ion_open(struct inode *inode, struct file *file)
 {
-	struct ion_dbg_client *c = kzalloc(sizeof(*c), GFP_KERNEL);
+	struct timelm_ion_client *c = kzalloc(sizeof(*c), GFP_KERNEL);
 
 	if (!c)
 		return -ENOMEM;
@@ -487,9 +496,9 @@ static int ion_dbg_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static int ion_dbg_release(struct inode *inode, struct file *file)
+static int timelm_ion_release(struct inode *inode, struct file *file)
 {
-	struct ion_dbg_client *c = file->private_data;
+	struct timelm_ion_client *c = file->private_data;
 	struct dma_buf *dmabuf;
 	unsigned long idx;
 
@@ -500,57 +509,30 @@ static int ion_dbg_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static const struct file_operations ion_dbg_fops = {
+static const struct file_operations timelm_ion_fops = {
 	.owner = THIS_MODULE,
-	.open = ion_dbg_open,
-	.release = ion_dbg_release,
-	.unlocked_ioctl = ion_dbg_ion_ioctl,
+	.open = timelm_ion_open,
+	.release = timelm_ion_release,
+	.unlocked_ioctl = timelm_ion_ioctl,
 #ifdef CONFIG_COMPAT
-	.compat_ioctl = ion_dbg_ion_ioctl,
+	.compat_ioctl = timelm_ion_ioctl,
 #endif
 	.llseek = no_llseek,
 };
 
-static struct miscdevice ion_dbg_dev = {
+static struct miscdevice timelm_ion_dev = {
 	.minor = MISC_DYNAMIC_MINOR,
 	.name = "ion",
-	.fops = &ion_dbg_fops,
+	.fops = &timelm_ion_fops,
 	.mode = 0666,
 };
 
-/* /dev/smcinvoke: still only a probe, nothing has reached it yet */
-static long smc_dbg_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
-{
-	pr_info("NODEDBG[smcinvoke]: ioctl nr=%u cmd=0x%x comm=%s pid=%d\n",
-		_IOC_NR(cmd), cmd, current->comm, task_pid_nr(current));
-	return -ENOSYS;
-}
-
-static const struct file_operations smc_dbg_fops = {
-	.owner = THIS_MODULE,
-	.unlocked_ioctl = smc_dbg_ioctl,
-#ifdef CONFIG_COMPAT
-	.compat_ioctl = smc_dbg_ioctl,
-#endif
-	.llseek = no_llseek,
-};
-
-static struct miscdevice smc_dbg_dev = {
-	.minor = MISC_DYNAMIC_MINOR,
-	.name = "smcinvoke",
-	.fops = &smc_dbg_fops,
-	.mode = 0666,
-};
-
-static int __init ion_dbg_init(void)
+static int __init timelm_ion_init(void)
 {
 	int ret;
 
-	ret = misc_register(&ion_dbg_dev);
+	ret = misc_register(&timelm_ion_dev);
 	pr_info("IONDBG: /dev/ion registered ret=%d\n", ret);
-
-	ret = misc_register(&smc_dbg_dev);
-	pr_info("NODEDBG: stub /dev/smcinvoke registered ret=%d\n", ret);
-	return 0;
+	return ret;
 }
-device_initcall(ion_dbg_init);
+device_initcall(timelm_ion_init);
