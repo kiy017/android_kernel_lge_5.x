@@ -239,6 +239,10 @@ static void lookup_notify(struct sockaddr_qrtr *to, struct qrtr_server *srv,
 	msg.msg_namelen = sizeof(*to);
 
 	ret = kernel_sendmsg(qrtr_ns.sock, &msg, &iv, 1, sizeof(pkt));
+	/* DEBUG(timelm): what a local client was told */
+	timelm_qrtrlog("NOTIFY new=%d -> %u:%x svc=%u at %u:%u ret=%d\n", new,
+		       to->sq_node, to->sq_port, srv ? srv->service : 0,
+		       srv ? srv->node : 0, srv ? srv->port : 0, ret);
 	if (ret < 0 && ret != -ENODEV)
 		pr_err_ratelimited("failed to send lookup notification %d\n",
 				   ret);
@@ -733,6 +737,17 @@ static void qrtr_ns_worker(struct kthread_work *work)
 
 		ns_log_msg(pkt, &sq);
 
+		/* DEBUG(timelm): what actually reached the nameservice */
+		if (cmd == QRTR_TYPE_NEW_SERVER || cmd == QRTR_TYPE_DEL_SERVER ||
+		    cmd == QRTR_TYPE_NEW_LOOKUP || cmd == QRTR_TYPE_DEL_LOOKUP)
+			timelm_qrtrlog("NS cmd=%u from %u:%x svc=%u inst=%u\n", cmd,
+				       sq.sq_node, sq.sq_port,
+				       le32_to_cpu(pkt->server.service),
+				       le32_to_cpu(pkt->server.instance));
+		else
+			timelm_qrtrlog("NS cmd=%u from %u:%x\n", cmd, sq.sq_node,
+				       sq.sq_port);
+
 		ret = 0;
 		switch (cmd) {
 		case QRTR_TYPE_HELLO:
@@ -776,9 +791,12 @@ static void qrtr_ns_worker(struct kthread_work *work)
 			break;
 		}
 
-		if (ret < 0)
+		if (ret < 0) {
+			timelm_qrtrlog("NS-ERR cmd=%u from %u:%x ret=%d\n", cmd,
+				       sq.sq_node, sq.sq_port, ret);
 			pr_err_ratelimited("failed while handling packet from %d:%d",
 			       sq.sq_node, sq.sq_port);
+		}
 	}
 
 	kfree(recv_buf);
