@@ -144,6 +144,7 @@ static int qcom_mhi_qrtr_probe(struct mhi_device *mhi_dev,
 	qdev->mhi_dev = mhi_dev;
 	qdev->dev = &mhi_dev->dev;
 	qdev->ep.xmit = qcom_mhi_qrtr_send;
+	qdev->ep.timelm_hold_hello = true;
 	init_completion(&qdev->prepared);
 	init_completion(&qdev->ringfull);
 

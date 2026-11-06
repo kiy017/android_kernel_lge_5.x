@@ -22,6 +22,8 @@ struct sk_buff;
  */
 struct qrtr_endpoint {
 	int (*xmit)(struct qrtr_endpoint *ep, struct sk_buff *skb);
+	/* timelm: let the remote side say hello first */
+	bool timelm_hold_hello;
 	/* private: not for endpoint use */
 	struct qrtr_node *node;
 };
