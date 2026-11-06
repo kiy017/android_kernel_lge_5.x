@@ -131,5 +131,3 @@ obj-$(CONFIG_DRM_TIDSS) += tidss/
 obj-y			+= xlnx/
 obj-y			+= gud/
 obj-$(CONFIG_DRM_HYPERV) += hyperv/
-# timelm: Xiaomi mi_disp_notifier, used by the display techpack (mi_disp/)
-obj-y += xiaomi/
