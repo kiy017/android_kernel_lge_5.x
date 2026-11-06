@@ -47,6 +47,9 @@ void qrtr_endpoint_unregister(struct qrtr_endpoint *ep);
 
 int qrtr_endpoint_post(struct qrtr_endpoint *ep, const void *data, size_t len);
 
+/* DEBUG(timelm) */
+__printf(1, 2) void timelm_qrtrlog(const char *fmt, ...);
+
 int qrtr_ns_init(void);
 
 void qrtr_ns_remove(void);
