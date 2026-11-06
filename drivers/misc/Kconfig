@@ -498,12 +498,12 @@ config QSEECOM_QTI
 	 in-tree because devices without a vendor_boot/vendor_dlkm
 	 partition cannot load qseecom.ko as a module.
 
-config TIMELM_ION_DBG
-	bool "TMPDBG: logging /dev/ion probe stub for timelm"
+config TIMELM_ION
+	bool "Legacy /dev/ion for the LG V60 vendor userspace"
 	help
-	 Temporary diagnostic: registers a /dev/ion that logs open/ioctl
-	 (size, heap mask, flags) and then fails, to find out whether the LG
-	 vendor userspace needs ION.  Remove once the ION decision is made.
+	  The 4.19-era vendor gralloc, Adreno UMD, audio HAL and TEE clients
+	  allocate through /dev/ion, which 5.15 does not have.  This maps their
+	  requests onto dma-heaps.  Also provides a /dev/smcinvoke stub.
 
 config QPNP_MISC
 	tristate "QPNP Misc Peripheral"
