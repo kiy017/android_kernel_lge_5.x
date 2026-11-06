@@ -3429,6 +3429,9 @@ static int snd_pcm_common_ioctl(struct file *file,
 	case SNDRV_PCM_IOCTL_FORWARD:
 		return snd_pcm_forward_ioctl(substream, arg);
 	}
+	/* timelm: QC 4.19, driver-private ioctls (LSM, DSP_POSITION, voice LCH) */
+	if (_IOC_TYPE(cmd) == 'U' && substream->ops->ioctl)
+		return substream->ops->ioctl(substream, cmd, arg);
 	pcm_dbg(substream->pcm, "unknown ioctl = 0x%x\n", cmd);
 	return -ENOTTY;
 }
@@ -3440,7 +3443,7 @@ static long snd_pcm_ioctl(struct file *file, unsigned int cmd,
 
 	pcm_file = file->private_data;
 
-	if (((cmd >> 8) & 0xff) != 'A')
+	if (_IOC_TYPE(cmd) != 'A' && _IOC_TYPE(cmd) != 'U')
 		return -ENOTTY;
 
 	return snd_pcm_common_ioctl(file, pcm_file->substream, cmd,

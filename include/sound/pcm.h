@@ -56,6 +56,9 @@ struct snd_pcm_ops {
 	int (*close)(struct snd_pcm_substream *substream);
 	int (*ioctl)(struct snd_pcm_substream * substream,
 		     unsigned int cmd, void *arg);
+	/* timelm: QC 4.19, 'U' ioctls from 32-bit userspace; arg is a user pointer */
+	int (*compat_ioctl)(struct snd_pcm_substream *substream,
+			    unsigned int cmd, void *arg);
 	int (*hw_params)(struct snd_pcm_substream *substream,
 			 struct snd_pcm_hw_params *params);
 	int (*hw_free)(struct snd_pcm_substream *substream);
