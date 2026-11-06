@@ -483,7 +483,13 @@ static void mhi_read_done_work_fn(struct work_struct *work)
 				buf);
 				mhi_buf_tbl_remove(mhi_info, TYPE_MHI_READ_CH,
 					buf, len);
-				break;
+				/*
+				 * DEBUG(timelm): keep draining. With no USB
+				 * every packet fails here with -ENOTCONN, and
+				 * a break strands completions that were
+				 * coalesced into this one work run.
+				 */
+				continue;
 			}
 		} else {
 			DIAG_LOG(DIAG_DEBUG_MHI,
