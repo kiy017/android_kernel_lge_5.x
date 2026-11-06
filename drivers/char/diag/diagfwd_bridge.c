@@ -22,6 +22,7 @@
 #include "diagfwd_mhi.h"
 #include "diag_dci.h"
 #include "diag_ipc_logging.h"
+#include "timelm_mdmlog.h"
 #ifdef CONFIG_LGE_DIAG_BYPASS
 #include "lg_diag_bypass.h"
 #endif
@@ -203,6 +204,8 @@ int diag_remote_dev_open(int id)
 	if (id < 0 || id >= NUM_REMOTE_DEV)
 		return -EINVAL;
 	bridge_info[id].inited = 1;
+	if (id == DIAGFWD_MDM)
+		timelm_mdmlog_open();
 	if (bridge_info[id].type == DIAG_DATA_TYPE) {
 		diag_notify_md_client(BRIDGE_TO_MUX(id), 0, DIAG_STATUS_OPEN);
 		return diag_mux_queue_read(BRIDGE_TO_MUX(id));
@@ -219,6 +222,8 @@ void diag_remote_dev_close(int id)
 	if (id < 0 || id >= NUM_REMOTE_DEV)
 		return;
 
+	if (id == DIAGFWD_MDM)
+		timelm_mdmlog_close();
 	diag_mux_close_device(BRIDGE_TO_MUX(id));
 
 	if (bridge_info[id].type == DIAG_DATA_TYPE)
@@ -235,6 +240,8 @@ int diag_remote_dev_read_done(int id, unsigned char *buf, int len)
 		return -EINVAL;
 	ch = &bridge_info[id];
 	if (ch->type == DIAG_DATA_TYPE) {
+		if (id == DIAGFWD_MDM)
+			timelm_mdmlog_add(buf, len);
 		err = diag_mux_write(BRIDGE_TO_MUX(id), buf, len, id);
 		if (ch->dev_ops && ch->dev_ops->queue_read)
 			ch->dev_ops->queue_read(id, ch->ctxt);
@@ -285,6 +292,7 @@ int diagfwd_bridge_init(void)
 {
 	int err = 0;
 
+	timelm_mdmlog_init();
 	err = diag_mdm_init();
 	if (err)
 		goto fail;
