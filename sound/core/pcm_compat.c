@@ -648,5 +648,12 @@ static long snd_pcm_ioctl_compat(struct file *file, unsigned int cmd, unsigned l
 #endif /* CONFIG_X86_X32 */
 	}
 
+	/* timelm: QC 4.19, driver-private ioctls; the vendor audio HALs are 32-bit */
+	if (_IOC_TYPE(cmd) == 'U' && substream->ops->compat_ioctl) {
+		if (PCM_RUNTIME_CHECK(substream))
+			return -ENXIO;
+		return substream->ops->compat_ioctl(substream, cmd, argp);
+	}
+
 	return -ENOIOCTLCMD;
 }
