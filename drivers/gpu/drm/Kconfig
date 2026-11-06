@@ -379,8 +379,6 @@ source "drivers/gpu/drm/tidss/Kconfig"
 
 source "drivers/gpu/drm/xlnx/Kconfig"
 
-# timelm: Xiaomi mi_disp_notifier, used by the display techpack (mi_disp/)
-source "drivers/gpu/drm/xiaomi/Kconfig"
 
 source "drivers/gpu/drm/gud/Kconfig"
 
