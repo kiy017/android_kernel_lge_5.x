@@ -163,6 +163,16 @@ enum drm_mode_status {
 
 #define DRM_MODE_FLAG_3D_MAX	DRM_MODE_FLAG_3D_SIDE_BY_SIDE_HALF
 
+/*
+ * Panel mode bits of the msm-4.19 uapi, still read from the mode flags by
+ * the sm8250 display HAL (command mode = smart panel = doze support). Not in
+ * DRM_MODE_FLAG_ALL; the msm DSI driver sets them and the core accepts them.
+ */
+#define DRM_MODE_FLAG_LEGACY_VID_MODE_PANEL	(1 << 29)
+#define DRM_MODE_FLAG_LEGACY_CMD_MODE_PANEL	(1 << 30)
+#define DRM_MODE_FLAG_LEGACY_PANEL_MODE \
+	(DRM_MODE_FLAG_LEGACY_VID_MODE_PANEL | DRM_MODE_FLAG_LEGACY_CMD_MODE_PANEL)
+
 #define DRM_MODE_MATCH_TIMINGS (1 << 0)
 #define DRM_MODE_MATCH_CLOCK (1 << 1)
 #define DRM_MODE_MATCH_FLAGS (1 << 2)

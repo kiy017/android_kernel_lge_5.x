@@ -1083,7 +1083,7 @@ drm_mode_validate_basic(const struct drm_display_mode *mode)
 	if (mode->type & ~DRM_MODE_TYPE_ALL)
 		return MODE_BAD;
 
-	if (mode->flags & ~DRM_MODE_FLAG_ALL)
+	if (mode->flags & ~(DRM_MODE_FLAG_ALL | DRM_MODE_FLAG_LEGACY_PANEL_MODE))
 		return MODE_BAD;
 
 	if ((mode->flags & DRM_MODE_FLAG_3D_MASK) > DRM_MODE_FLAG_3D_MAX)
