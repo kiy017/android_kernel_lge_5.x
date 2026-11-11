@@ -70,7 +70,7 @@ CONFIG_SETEND_EMULATION=y
 CONFIG_ARM64_MPAM=y
 CONFIG_RANDOMIZE_BASE=y
 # CONFIG_RANDOMIZE_MODULE_REGION_FULL is not set
-CONFIG_CMDLINE="loglevel=7 printk.devkmsg=on androidboot.selinux=permissive clk_ignore_unused pd_ignore_unused androidboot.slot_suffix=_a androidboot.boot_devices=soc/1d84000.ufshc androidboot.bootdevice=1d84000.ufshc androidboot.verifiedbootstate=orange firmware_class.path=/vendor/firmware,/vendor/firmware_mnt/image androidboot.baseband=mdm"
+CONFIG_CMDLINE="loglevel=7 printk.devkmsg=on androidboot.selinux=permissive clk_ignore_unused pd_ignore_unused androidboot.boot_devices=soc/1d84000.ufshc androidboot.bootdevice=1d84000.ufshc androidboot.verifiedbootstate=orange firmware_class.path=/vendor/firmware,/vendor/firmware_mnt/image androidboot.baseband=mdm"
 CONFIG_CMDLINE_EXTEND=y
 # CONFIG_DMI is not set
 CONFIG_HIBERNATION=y
