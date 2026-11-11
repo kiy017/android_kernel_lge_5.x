@@ -207,7 +207,7 @@
  * reference values, not LG's.  LG overrides several rails in
  *   kona-timelm_common-panel.dtsi            (&pm8150a_l11)
  *   kona-timelm_common-pm.dtsi               (&pm8150a_l4)
- *   kona-timelm_dcm_jp_rev-1.0-overlay.dts   (&pm8150a_l3)
+ *   kona-timelm_*_rev-*-overlay.dts           (&pm8150a_l3, see the rev leaves)
  * and the live device DT confirms the result.  Without these the rails come
  * up at the reference voltage instead of the one the hardware is built for.
  */
@@ -229,15 +229,10 @@
 };
 
 /*
- * pm8150a_l3 - accessory/DS3 detect rail on this board revision; LG runs it
- * at 1.2 V (rev-1.0 overlay) while the reference table initialises 0.8 V.
- * No in-tree consumer, but the rail is still programmed at registration.
+ * pm8150a_l3 - accessory/DS3 detect rail.  LG fixes it at 1.2 V in every
+ * overlay except rev 0.0 and a, so the override is in the
+ * kona-timelm_*_rev-*.dts leaves, not here.
  */
-&pm8150a_l3 {
-	regulator-min-microvolt = <1200000>;
-	regulator-max-microvolt = <1200000>;
-	qcom,init-voltage = <1200000>;
-};
 
 /*
  * pm8150a_l4 / pm8150a_l5 - camera VIO rails.  Initial voltage is already

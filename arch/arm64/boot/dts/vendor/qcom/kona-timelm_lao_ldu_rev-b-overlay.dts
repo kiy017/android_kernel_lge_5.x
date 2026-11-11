@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * dtbo entry for lao_ldu rev_b: LG kona-timelm_lao_ldu/kona-timelm_lao_ldu_rev-b-overlay.dts.
+ * Same source as kona-timelm_lao_ldu_rev-b.dts without the base; LK applies it to
+ * kona-timelm.dtb (boot image) when its qcom,board-id matches.
+ */
+
+/dts-v1/;
+/plugin/;
+
+#define TIMELM_DTBO
+#include "kona-timelm-dtbo.dtsi"
+#include "kona-timelm_lao_ldu_rev-b.dts"

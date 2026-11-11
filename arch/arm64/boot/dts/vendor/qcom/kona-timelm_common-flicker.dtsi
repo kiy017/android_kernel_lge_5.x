@@ -1,0 +1,53 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * timelm: AMS TCS3407 flicker sensor, LG kona-timelm_common-flicker.dtsi
+ * (included by every 4.19 overlay except rev 0.0, a and b1) + its interrupt
+ * pins from LG kona-timelm_common-pinctrl.dtsi.  Matches v60-live.dts.
+ * No ams_tcs3407 driver in this tree yet (4.19: drivers/input/misc/tcs3407).
+ */
+
+&tlmm {
+	tcs3407_int_pin {
+		tcs3407_int_active: tcs3407_int_active {
+			mux {
+				pins = "gpio125";
+				function = "gpio";
+			};
+			config {
+				pins = "gpio125";
+				drive-strength = <2>;
+				input-enable;
+				bias-disable;
+			};
+		};
+
+		tcs3407_int_suspend: tcs3407_int_suspend {
+			mux {
+				pins = "gpio125";
+				function = "gpio";
+			};
+			config {
+				pins = "gpio125";
+				drive-strength = <2>;
+				bias-disable;
+			};
+		};
+	};
+};
+
+&qupv3_se4_i2c { /* QUP_4 (Flicker) */
+	qcom,clk-freq-out = <400000>;
+	status = "ok";
+	tcs3407@39 {
+		compatible = "ams_tcs3407";
+		reg = <0x39>;
+		ams,gpio_irq = <&tlmm 125 0x00>;
+		interrupt-parent = <&tlmm>;
+		interrupts = <125 0x0>;
+		pinctrl-names = "default", "sleep";
+		pinctrl-0 = <&tcs3407_int_active>;
+		pinctrl-1 = <&tcs3407_int_suspend>;
+		qcom,clk-src = "BBCLK2";
+		status = "ok";
+	};
+};
