@@ -1,21 +1,15 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * LG V60 ThinQ 5G (timelm) sb_jp, 4.19 CONFIG_MACH_KONA_TIMELM_SB_JP.
- * One DTB for revs 1.0, b, b2, c: they do not differ in what is ported here
- * (flicker and usb_ds3 acc detect are not ported), so no rev_x in the model.
- * Left out: rev 0.0 and a (other cameras), b1 (no dac,es9219).
+ * Shared by the kona-timelm_sb_jp_rev-*.dts leaves, as LG
+ * kona-timelm_sb_jp/kona-timelm_sb_jp.dtsi is shared by its rev overlays.
  */
 
-/dts-v1/;
-#include "kona-timelm.dtsi"
 /* Sony CXD2252 NFC (stock cxd22xx-i2c@28 on qupv3_se1_i2c) */
 #include "kona-timelm-nfc.dtsi"
 
 / {
-	model = "LG Electronics, Timelm_sb_jp";
 	compatible = "qcom,kona", "lg,timelm";
-	qcom,board-id = <0x030C0008 0>, <0x03070008 0>, <0x03070208 0>,
-			<0x03080008 0>;
 };
 
 /* JP partition tables have no OP; a crossflashed phone has one, leave it unused */

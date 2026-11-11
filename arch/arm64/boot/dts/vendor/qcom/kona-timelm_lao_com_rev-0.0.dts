@@ -1,0 +1,24 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * LG V60 ThinQ 5G (timelm) lao_com rev_0.0, from LG
+ * kona-timelm_lao_com/kona-timelm_lao_com_rev-0.0-overlay.dts.
+ * Not ported:
+ * - &lge_usb_debugger lge,always-console-enable: no lge_usb_debugger
+ *   node or driver here, and this port uses no UART console.
+ */
+
+#ifndef TIMELM_DTBO
+/dts-v1/;
+#include "kona-timelm.dtsi"
+#endif
+#include "kona-timelm_lao_com.dtsi"
+#include "kona-timelm-camera_rev0.dtsi"
+
+/ {
+	model = "LG Electronics, Timelm_lao, rev_0.0";
+	qcom,board-id = <8 0>;
+};
+
+&mdm0 {
+	status = "disabled";
+};

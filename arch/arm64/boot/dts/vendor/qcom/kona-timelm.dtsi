@@ -25,7 +25,7 @@
  * (LG kona-timelm-camera_revb) come in a later stage.
  */
 #include "camera/kona-camera-lge.dtsi"
-/* LG camera modules (sensors, actuators, OIS, eeproms, flash, lrmc) */
+/* lrmc + rear camera pins; sensors etc. are per rev (kona-timelm-camera_rev*.dtsi) */
 #include "kona-timelm-camera.dtsi"
 /* Egis ET713 fingerprint (LG kona-timelm_common-fingerprint.dtsi) */
 #include "kona-timelm-fingerprint.dtsi"
