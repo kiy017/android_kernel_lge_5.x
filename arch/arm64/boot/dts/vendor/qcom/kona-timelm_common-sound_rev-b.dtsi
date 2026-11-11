@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * timelm: ES9219C hi-fi DAC on board revisions 1.0, 1.01, 1.02, b, b2, c, d, e.
+ * LG kona-timelm_{dcm_jp,sb_jp,lao_com,lao_ldu}-sound_rev-b.dtsi (the four
+ * copies are identical; the rest of the LG sound dtsi is the common audio
+ * DT in kona-timelm-audio-codecs.dtsi / kona-timelm-audio-platform.dtsi).
+ */
+
+&tl_es9218_codec_48 {
+	dac,switch-gpio = <&tlmm 25 0x0>;
+	/* set for ES9219C */
+	dac,es9219;
+	clock-names = "hifi_mclk";
+	clocks = <&rpmhcc RPMH_LN_BB_CLK2>;
+};

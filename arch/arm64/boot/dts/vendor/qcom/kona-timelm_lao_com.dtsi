@@ -1,20 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * LG V60 ThinQ 5G (timelm) lao_com, 4.19 CONFIG_MACH_KONA_TIMELM_LAO_COM.
- * One DTB for revs 1.0, 1.01, 1.02, b, b2, c, d, e: they do not differ in what is ported here
- * (flicker and usb_ds3 acc detect are not ported), so no rev_x in the model.
- * Left out: rev 0.0 and a (other cameras), b1 (no dac,es9219).
+ * Shared by the kona-timelm_lao_com_rev-*.dts leaves, as LG
+ * kona-timelm_lao_com/kona-timelm_lao_com.dtsi is shared by its rev overlays.
  */
 
-/dts-v1/;
-#include "kona-timelm.dtsi"
 
 / {
-	model = "LG Electronics, Timelm_lao";
 	compatible = "qcom,kona", "lg,timelm";
-	qcom,board-id = <0x000C0008 0>, <0x000C0108 0>, <0x000C0208 0>,
-			<0x00070008 0>, <0x00070208 0>, <0x00080008 0>,
-			<0x00090008 0>, <0x000A0008 0>;
 };
 
 /*

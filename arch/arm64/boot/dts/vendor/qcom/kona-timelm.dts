@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * LG V60 ThinQ 5G (timelm) base DTB for the boot image when the board
+ * revisions come from dtbo (kona-timelm_*_rev-*-overlay.dtbo), as on stock:
+ * LG's boot image carries generic kona base DTBs with qcom,board-id <0 0>
+ * and LK applies the dtbo entry whose qcom,board-id matches the CDT.
+ * Built with -@, so the overlays resolve their labels against __symbols__.
+ */
+
+/dts-v1/;
+#include "kona-timelm.dtsi"
+
+/ {
+	qcom,board-id = <0 0>;
+};

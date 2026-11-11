@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/*
+ * LG V60 ThinQ 5G (timelm) lao_ldu, 4.19 CONFIG_MACH_KONA_TIMELM_LAO_LDU.
+ * Shared by the kona-timelm_lao_ldu_rev-*.dts leaves, as LG
+ * kona-timelm_lao_ldu/kona-timelm_lao_ldu.dtsi is shared by its rev overlays.
+ * LG leaves the PN547 NFC include commented out for lao_ldu.
+ */
+
+
+/ {
+	compatible = "qcom,kona", "lg,timelm";
+};

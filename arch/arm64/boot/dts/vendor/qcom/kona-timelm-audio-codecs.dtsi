@@ -1999,10 +1999,12 @@
 			dac,power-gpio = <&pm8150_gpios 0xa 0x0>;
 			dac,hph-sw = <&pm8150_gpios 0x9 0x0>;
 			dac,reset-gpio = <&tlmm 0x16 0x0>;
-			dac,switch-gpio = <&tlmm 0x19 0x0>;
-			dac,es9219;
-			clock-names = "hifi_mclk";
-			clocks = <&rpmhcc 0x2>;
+			/*
+			 * dac,switch-gpio, dac,es9219 and the hifi_mclk clock
+			 * differ per board revision: kona-timelm_common-sound_rev-b.dtsi
+			 * and kona-timelm_common-sound_rev-b1.dtsi (LG
+			 * kona-timelm_*-sound_rev-b{,1}.dtsi).
+			 */
 		};
 };
 
