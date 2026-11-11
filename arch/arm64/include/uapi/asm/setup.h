@@ -22,6 +22,13 @@
 
 #include <linux/types.h>
 
-#define COMMAND_LINE_SIZE	2048
+/*
+ * timelm: LG's LK passes ~2060 bytes of bootargs on its own, with the device
+ * specific values (androidboot.slot_suffix, serialno, keymaster, dtbo_idx,
+ * msm_drm.dsi_display0) at the very end.  With CONFIG_CMDLINE_EXTEND putting
+ * CONFIG_CMDLINE in front, 2048 cut all of them, and a hardcoded slot_suffix
+ * booted the inactive slot on phones sitting on _b.
+ */
+#define COMMAND_LINE_SIZE	4096
 
 #endif
