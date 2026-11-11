@@ -1685,6 +1685,8 @@ static int qseecom_register_listener(struct qseecom_dev_handle *data,
 
 	data->listener.id = rcvd_lstnr.listener_id;
 	pr_debug("Service %d is registered\n", rcvd_lstnr.listener_id);
+	pr_info("QSEECOMDBG: lstnr 0x%x registered sb_len=%u comm=%s\n",
+		rcvd_lstnr.listener_id, rcvd_lstnr.sb_size, current->comm);
 	return ret;
 }
 
@@ -2187,6 +2189,29 @@ static void __qseecom_clean_listener_sglistinfo(
 	}
 }
 
+/*
+ * TMPDBG (timelm): trace TA -> listener round trips (img143).  On the VM and
+ * SoftBank phones keymaster's begin() for vold's metadata key fails with
+ * INVALID_ARGUMENT right after two listener calls; log which listener, the
+ * head of the request the TA wrote and the response the daemon left in the
+ * shared buffer, and what TZ returned next.
+ */
+#define TIMELM_LSTNR_DUMP	64
+
+static void timelm_lstnr_dbg(const char *what,
+			     struct qseecom_dev_handle *data,
+			     struct qseecom_registered_listener_list *svc,
+			     uint32_t lstnr, uint32_t status)
+{
+	size_t n = 0;
+
+	if (svc && svc->sb_virt)
+		n = min_t(size_t, svc->sb_length, TIMELM_LSTNR_DUMP);
+	pr_info("QSEECOMDBG: lstnr 0x%x %s app %u '%s' status %u sb[%zu]: %*ph\n",
+		lstnr, what, data->client.app_id, data->client.app_name,
+		status, n, (int)n, n ? svc->sb_virt : NULL);
+}
+
 static int __qseecom_process_incomplete_cmd(struct qseecom_dev_handle *data,
 					struct qseecom_command_scm_resp *resp)
 {
@@ -2223,6 +2248,8 @@ static int __qseecom_process_incomplete_cmd(struct qseecom_dev_handle *data,
 					status = QSEOS_RESULT_FAILURE;
 					goto err_resp;
 				}
+				timelm_lstnr_dbg("req", data, ptr_svc,
+						 lstnr, 0);
 				wake_up_interruptible(&ptr_svc->rcv_req_wq);
 				break;
 			}
@@ -2346,8 +2373,11 @@ err_resp:
 			if (ret)
 				goto exit;
 
+			timelm_lstnr_dbg("rsp", data, ptr_svc, lstnr, status);
 			ret = qseecom_scm_call(SCM_SVC_TZSCHEDULER, 1,
 					cmd_buf, cmd_len, resp, sizeof(*resp));
+			pr_info("QSEECOMDBG: lstnr 0x%x done ret %d -> result %u data 0x%x\n",
+				lstnr, ret, resp->result, resp->data);
 			ptr_svc->listener_in_use = false;
 			__qseecom_clean_listener_sglistinfo(ptr_svc);
 
@@ -2555,6 +2585,8 @@ static int __qseecom_reentrancy_process_incomplete_cmd(
 					status = QSEOS_RESULT_FAILURE;
 					goto err_resp;
 				}
+				timelm_lstnr_dbg("req", data, ptr_svc,
+						 lstnr, 0);
 				wake_up_interruptible(&ptr_svc->rcv_req_wq);
 				break;
 			}
@@ -2671,8 +2703,11 @@ err_resp:
 			if (ret)
 				goto exit;
 
+			timelm_lstnr_dbg("rsp", data, ptr_svc, lstnr, status);
 			ret = qseecom_scm_call(SCM_SVC_TZSCHEDULER, 1,
 					cmd_buf, cmd_len, resp, sizeof(*resp));
+			pr_info("QSEECOMDBG: lstnr 0x%x done ret %d -> result %u data 0x%x\n",
+				lstnr, ret, resp->result, resp->data);
 			ptr_svc->listener_in_use = false;
 			__qseecom_clean_listener_sglistinfo(ptr_svc);
 			wake_up_interruptible(&ptr_svc->listener_block_app_wq);
