@@ -4,12 +4,14 @@
 # securemsm-kernel crypto-qti -> qce50_dlkm.ko + qcedev-mod_dlkm.ko, for
 # Widevine liboemcrypto.so -> libcpion.so (stock CRYPTO_DEV_QCEDEV=y).
 #
+# Also smcinvoke_dlkm.ko (/dev/smcinvoke for ssgtzd, stock QCOM_SMCINVOKE=y).
+#
 # securemsm's Kbuild includes config/sec-kernel_defconfig*.conf, which would
-# also build tz_log/qcrypto/hdcp/qrng/qseecom_proxy/smcinvoke/qseecom.
+# also build tz_log/qcrypto/hdcp/qrng/qseecom_proxy/qseecom.
 # Those confs assign with plain "=" inside the Makefile, so (unlike the old
 # command-line overrides) an export here cannot clear them; the conf lines
-# are commented out in securemsm-kernel/config instead.  qseecom and
-# smcinvoke are built in (drivers/misc/qseecom_qti).
+# are commented out in securemsm-kernel/config instead.  qseecom is built
+# in (drivers/misc/qseecom_qti).
 
 export SSG_MODULE_ROOT := $(realpath $(srctree)/$(src)/securemsm-kernel)
 export CONFIG_CRYPTO_DEV_QCEDEV := m
