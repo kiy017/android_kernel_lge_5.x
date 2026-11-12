@@ -9,6 +9,8 @@
 #include <linux/device.h>
 #include <linux/string.h>
 #include <linux/module.h>
+#include <linux/of.h>
+#include <linux/math64.h>
 
 #ifndef MAX
 #define MAX(x, y) (((x) > (y)) ? (x) : (y))
@@ -22,6 +24,11 @@
 enum aggr_logic {
 	VIRT_MINIMUM,
 	VIRT_MAXIMUM,
+	/*
+	 * (sum(temp[i] * coefficients[i]) + avg_offset) / avg_denominator,
+	 * as the 4.19 of-thermal virtual sensors (e.g. LG's vts-virt-therm).
+	 */
+	VIRT_WEIGHTED_AVG,
 };
 
 struct virtual_sensor_data {
@@ -32,6 +39,9 @@ struct virtual_sensor_data {
 	enum aggr_logic		   logic;
 	int				sensor_id;
 	struct sensor_names *sensors_name;
+	int32_t			   *coefficients;
+	int32_t			   avg_offset;
+	int32_t			   avg_denominator;
 	struct thermal_zone_device	*tz[0];
 };
 
@@ -43,6 +53,7 @@ static int virtual_sensor_read(void *data, int *temp)
 {
 	struct virtual_sensor_data *vs_sens = (struct virtual_sensor_data *)data;
 	int ret = 0, idx = 0, curr_temp = 0;
+	s64 wavg_sum = 0;
 
 	curr_temp = (vs_sens->logic == VIRT_MAXIMUM) ? INT_MIN : INT_MAX;
 
@@ -63,10 +74,16 @@ static int virtual_sensor_read(void *data, int *temp)
 		case VIRT_MAXIMUM:
 			curr_temp = MAX(curr_temp, sens_temp);
 			break;
+		case VIRT_WEIGHTED_AVG:
+			wavg_sum += (s64)sens_temp * vs_sens->coefficients[idx];
+			break;
 		default:
 			break;
 		}
 	}
+	if (vs_sens->logic == VIRT_WEIGHTED_AVG)
+		curr_temp = div_s64(wavg_sum + vs_sens->avg_offset,
+					vs_sens->avg_denominator);
 	vs_sens->last_reading = *temp = curr_temp;
 
 	return 0;
@@ -75,6 +92,45 @@ static int virtual_sensor_read(void *data, int *temp)
 static struct thermal_zone_of_device_ops virtual_sensor_ops = {
 	.get_temp = virtual_sensor_read,
 };
+
+static int virtual_sensor_parse_wavg(struct device *dev,
+		struct device_node *np, struct virtual_sensor_data *vs_sens)
+{
+	u32 val;
+	int ret;
+
+	ret = of_property_count_u32_elems(np, "qcom,coefficients");
+	if (ret != vs_sens->num_sensors) {
+		dev_err(dev, "%pOFn: need %d coefficients, got %d\n",
+				np, vs_sens->num_sensors, ret);
+		return -EINVAL;
+	}
+
+	vs_sens->coefficients = devm_kcalloc(dev, vs_sens->num_sensors,
+				sizeof(*vs_sens->coefficients), GFP_KERNEL);
+	if (!vs_sens->coefficients)
+		return -ENOMEM;
+
+	/* negative weights are stored as two's complement cells */
+	ret = of_property_read_u32_array(np, "qcom,coefficients",
+				(u32 *)vs_sens->coefficients, vs_sens->num_sensors);
+	if (ret)
+		return ret;
+
+	vs_sens->avg_offset = 0;
+	if (!of_property_read_u32(np, "qcom,avg-offset", &val))
+		vs_sens->avg_offset = (int32_t)val;
+
+	vs_sens->avg_denominator = 1;
+	if (!of_property_read_u32(np, "qcom,avg-denominator", &val))
+		vs_sens->avg_denominator = (int32_t)val;
+	if (!vs_sens->avg_denominator) {
+		dev_err(dev, "%pOFn: avg-denominator is 0\n", np);
+		return -EINVAL;
+	}
+
+	return 0;
+}
 
 static int virtual_sensor_probe(struct platform_device *pdev)
 {
@@ -104,6 +160,12 @@ static int virtual_sensor_probe(struct platform_device *pdev)
 
 		vs_sens->logic = res;
 		vs_sens->num_sensors = sensors_cnt;
+
+		if (vs_sens->logic == VIRT_WEIGHTED_AVG) {
+			ret = virtual_sensor_parse_wavg(dev, subsys_np, vs_sens);
+			if (ret)
+				return ret;
+		}
 		vs_sens->dev = dev;
 		vs_sens->sensor_id = sens_id;
 		vs_sens->sensors_name = devm_kcalloc(dev, sensors_cnt + 1,
