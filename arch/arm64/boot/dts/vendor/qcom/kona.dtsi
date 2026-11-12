@@ -443,6 +443,8 @@
 
 		qcom_smcinvoke {
 			compatible = "qcom,smcinvoke";
+			/* kona TZ takes smcinvoke as 0x32000600 (msm-4.19) */
+			qcom,support-legacy_smc;
 		};
 
 		android {
