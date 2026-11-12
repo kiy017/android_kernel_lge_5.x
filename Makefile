@@ -1212,9 +1212,9 @@ export MODULES_NSDEPS := $(extmod_prefix)modules.nsdeps
 
 PHONY += headers
 
-ext-mod-dir := ../sm8550-modules
-ext-mod-dirs := $(ext-mod-dir)/qcom/opensource/audio-kernel $(ext-mod-dir)/qcom/opensource/display-drivers $(ext-mod-dir)/qcom/opensource/video-kernel $(ext-mod-dir)/nxp/opensource/driver
-ext-mod-dirs := $(subst $(srctree)/,,$(ext-mod-dirs))
+# timelm: the vendor drivers are built from techpack/ (Elite audio, kona
+# video, LG camera/cvp), so export their uapi from there.
+ext-mod-dirs := techpack/audio/audio-kernel-elite techpack/camera techpack/cvp techpack/display techpack/video
 
 #Default location for installed headers
 ifeq ($(KBUILD_EXTMOD),)
