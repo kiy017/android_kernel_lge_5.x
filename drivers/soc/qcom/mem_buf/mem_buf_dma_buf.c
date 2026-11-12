@@ -627,24 +627,6 @@ bool mem_buf_dma_buf_exclusive_owner(struct dma_buf *dmabuf)
 	struct mem_buf_vmperm *vmperm;
 	bool ret = false;
 
-	/*
-	 * A dma-buf that was not exported through mem_buf_dma_buf_export() has
-	 * no VM-permission bookkeeping at all, so it cannot have been lent or
-	 * shared with another VM: it is owned exclusively by its creator.
-	 *
-	 * This matters for adsprpc: it derives the secure-mapping attribute
-	 * from this helper (map->secure = exclusive_owner ? 0 : 1).  Without
-	 * the early return every dma-buf coming from the dma-heap/ION shim is
-	 * classified "secure", which burns a secure SMMU session per open file
-	 * and ends in
-	 *   fastrpc_session_alloc_secure_memory: max concurrent sessions limit
-	 *   (6) already reached on dsps err -87
-	 * plus one WARN per mapping, which is what the img42 log shows for the
-	 * sensors (sscrpcd) and vppservice RPC calls.
-	 */
-	if (dmabuf->ops->attach != mem_buf_dma_buf_attach)
-		return true;
-
 	vmperm = to_mem_buf_vmperm(dmabuf);
 	if (WARN_ON(IS_ERR(vmperm)))
 		return false;
