@@ -4154,6 +4154,7 @@
 #include "kona-qupv3.dtsi"
 #include "kona-pcie.dtsi"
 #include "kona-smp2p.dtsi"
+#include "kona-npu.dtsi"
 #include "msm-rdbg.dtsi"
 #include "kona-thermal.dtsi"
 #include "kona-coresight.dtsi"
