@@ -426,6 +426,18 @@ config MSM_ADSPRPC
 		applications/compute DSP processor.
 		Say M if you want to enable this module.
 
+config MSM_ADSPRPC_DEBUG_PD_CREATE
+	bool "Log failed FastRPC dynamic process creation"
+	depends on MSM_ADSPRPC
+	help
+	  Log the remote error, attributes and method of a failed dynamic
+	  (user) process create. The DSP returns its own error code here,
+	  e.g. 0x80000453 (AEE_EBADASID) when the fastrpc shell in the dsp
+	  partition does not match the DSP firmware, which userspace only
+	  reports with "errno Success".
+
+	  If unsure, say N.
+
 config MSM_ADSPRPC_TRUSTED
 	tristate "QTI FastRPC trusted driver"
 	depends on PM_SLEEP && HAS_DMA && CMA && MMU
