@@ -4129,8 +4129,13 @@ static int fastrpc_init_create_dynamic_process(struct fastrpc_file *fl,
 	ioctl.perf_dsp = NULL;
 	ioctl.job = NULL;
 	err = fastrpc_internal_invoke(fl, FASTRPC_MODE_PARALLEL, KERNEL_MSG_WITH_ZERO_PID, &ioctl);
-	if (err)
+	if (err) {
+#ifdef CONFIG_MSM_ADSPRPC_DEBUG_PD_CREATE
+		ADSPRPC_ERR("dynamic process create on %s failed: %d (0x%x), attrs 0x%x, sc 0x%x\n",
+			current->comm, err, err, uproc->attrs, ioctl.inv.sc);
+#endif
 		goto bail;
+	}
 bail:
 	/*
 	 * Shell is loaded into the donated memory on remote subsystem. So, the
