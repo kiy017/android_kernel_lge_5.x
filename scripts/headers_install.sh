@@ -91,6 +91,15 @@ include/uapi/linux/hw_breakpoint.h:CONFIG_HAVE_MIXED_BREAKPOINTS_REGS
 include/uapi/linux/pktcdvd.h:CONFIG_CDROM_PKTCDVD_WCACHE
 "
 
+# timelm: the Elite audio uapi (4.19 ABI) names its effect commands
+# CONFIG_CACHE/SET/GET. They are not Kconfig symbols, and the sm8250 audio HAL
+# uses these names.
+config_leak_ignores="$config_leak_ignores
+audio-kernel-elite/include/uapi/sound/audio_effects.h:CONFIG_CACHE
+audio-kernel-elite/include/uapi/sound/audio_effects.h:CONFIG_SET
+audio-kernel-elite/include/uapi/sound/audio_effects.h:CONFIG_GET
+"
+
 for c in $configs
 do
 	leak_error=1
