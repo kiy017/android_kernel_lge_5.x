@@ -374,7 +374,11 @@
 			entry-latency-us = <3263>;
 			exit-latency-us = <6562>;
 			min-residency-us = <9987>;
-			arm,psci-suspend-param = <0x4100c344>;
+			/*
+			 * kona llcc-off: cluster mode 0xc24 << 4 | CPU rail-pc 4
+			 * (stock 4.19 lpm-levels); 0x4100c344 is lahaina's.
+			 */
+			arm,psci-suspend-param = <0x4100c244>;
 		};
 	};
 
