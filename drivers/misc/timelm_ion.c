@@ -33,7 +33,8 @@
  * qcom,qseecom-ta and qcom,user-contig are CMA-backed and export their buffers
  * through mem_buf_dma_buf_export(), which is also what
  * qseecom_create_bridge_for_secbuf() and mem_buf_dma_buf_exclusive_owner()
- * expect.
+ * expect.  The system heaps are the qcom ones for the same reason (as the
+ * vidc, cvp and camera drivers use), not the upstream system heap.
  */
 #include <linux/miscdevice.h>
 #include <linux/fs.h>
@@ -101,8 +102,8 @@ static const char *const timelm_ion_heap_names[TIMELM_ION_HEAP_MAX] = {
 	"qcom,qseecom",
 	"qcom,qseecom-ta",
 	"qcom,user-contig",
-	"system",
-	"system-uncached",
+	"qcom,system",
+	"qcom,system-uncached",
 };
 
 /*
@@ -144,9 +145,10 @@ static struct dma_heap *timelm_ion_get_heap(enum timelm_ion_heap_id id)
  * The vendor gralloc and the Adreno UMD allocate every graphics buffer through
  * here (ION_SYSTEM_HEAP, mask 0x2000000).  Without ION_FLAG_CACHED they treat
  * the buffer as uncached and never do cache maintenance, so it must come from
- * the write-combined system-uncached heap: from the cached "system" heap, CPU
- * writes (glyph atlases, decoded bitmaps) stay in the CPU cache and the GPU
- * samples stale DRAM (img48: missing glyphs, black tiles in the wallpaper).
+ * the write-combined qcom,system-uncached heap: from the cached qcom,system
+ * heap, CPU writes (glyph atlases, decoded bitmaps) stay in the CPU cache and
+ * the GPU samples stale DRAM (img48: missing glyphs, black tiles in the
+ * wallpaper).
  */
 static enum timelm_ion_heap_id timelm_ion_heap_for_mask(u32 mask, u32 flags)
 {
