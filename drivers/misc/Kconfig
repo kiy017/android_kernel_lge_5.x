@@ -503,7 +503,7 @@ config TIMELM_ION
 	help
 	  The 4.19-era vendor gralloc, Adreno UMD, audio HAL and TEE clients
 	  allocate through /dev/ion, which 5.15 does not have.  This maps their
-	  requests onto dma-heaps.  Also provides a /dev/smcinvoke stub.
+	  requests onto dma-heaps.
 
 config QPNP_MISC
 	tristate "QPNP Misc Peripheral"
