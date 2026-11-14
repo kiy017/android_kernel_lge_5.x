@@ -5,6 +5,10 @@
 # kona-timelm_<variant>_rev-<rev>-overlay.dtbo, applied by LK to the base
 # kona-timelm.dtb (boot image + dtbo image, all revs; see build-dtbo.sh).
 
+# ROM builds (device/qcom/kernelscripts) pass CONFIG_BUILD_ARM64_DT_OVERLAY=y
+# with BOARD_KERNEL_SEPARATED_DTBO and pack every *.dtb into dtb.img, so only
+# the base is built there; the revs come from the dtbo image.
+ifneq ($(CONFIG_BUILD_ARM64_DT_OVERLAY),y)
 dtb-y += kona-timelm_dcm_jp_rev-0.0.dtb
 dtb-y += kona-timelm_dcm_jp_rev-1.0.dtb
 dtb-y += kona-timelm_dcm_jp_rev-a.dtb
@@ -42,6 +46,7 @@ dtb-y += kona-timelm_lao_ldu_rev-b2.dtb
 dtb-y += kona-timelm_lao_ldu_rev-c.dtb
 dtb-y += kona-timelm_lao_ldu_rev-d.dtb
 dtb-y += kona-timelm_lao_ldu_rev-e.dtb
+endif
 
 dtb-y += kona-timelm.dtb
 
