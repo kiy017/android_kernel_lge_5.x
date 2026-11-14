@@ -1,24 +1,52 @@
-soong_namespace {
-}
+// Kernel uapi for ROM builds (AOSPA): the vendor HALs take it from
+// qti_kernel_headers / generated_kernel_headers.  The headers are generated
+// from this tree at build time (scripts/gen_uapi_headers.py, the same output
+// as "make headers_install" incl. the techpack vendor driver uapi); the
+// genrules and their output lists are in gen_headers_<arch>.bp.
 
+build = [
+    "gen_headers_arm.bp",
+    "gen_headers_arm64.bp",
+]
+
+// scripts/unifdef.c names a variable constexpr, a keyword since C23.
 cc_binary_host {
-    name: "unifdef",
+    name: "timelm_unifdef",
     srcs: ["scripts/unifdef.c"],
+    c_std: "gnu11",
     sanitize: {
         never: true,
     },
 }
 
-genrule {
-    name: "gen-headers_install.sh",
-    srcs: ["scripts/headers_install.sh"],
-    tools: ["unifdef"],
-    out: ["headers_install.sh"],
-    cmd: "sed 's+scripts/unifdef+$${LOC_UNIFDEF:-$$(dirname $$0)/unifdef}+g' $(in) > $(out)",
+cc_library_headers {
+    name: "qti_kernel_headers",
+    vendor: true,
+    recovery_available: true,
+    arch: {
+        arm: {
+            generated_headers: ["timelm_uapi_headers_arm"],
+            export_generated_headers: ["timelm_uapi_headers_arm"],
+        },
+        arm64: {
+            generated_headers: ["timelm_uapi_headers_arm64"],
+            export_generated_headers: ["timelm_uapi_headers_arm64"],
+        },
+    },
 }
 
-sh_binary_host {
-    name: "headers_install.sh",
-    src: ":gen-headers_install.sh",
-    required: ["unifdef"],
+cc_library_headers {
+    name: "generated_kernel_headers",
+    vendor: true,
+    recovery_available: true,
+    arch: {
+        arm: {
+            generated_headers: ["timelm_uapi_headers_arm"],
+            export_generated_headers: ["timelm_uapi_headers_arm"],
+        },
+        arm64: {
+            generated_headers: ["timelm_uapi_headers_arm64"],
+            export_generated_headers: ["timelm_uapi_headers_arm64"],
+        },
+    },
 }
