@@ -2624,4 +2624,175 @@ struct v4l2_create_buffers {
 
 #define BASE_VIDIOC_PRIVATE	192		/* 192-255 are private */
 
+#ifndef __KERNEL__
+/* from 4.19 videodev2.h */
+#define V4L2_PIX_FMT_RGBA8888_UBWC   v4l2_fourcc('Q', 'R', 'G', 'B')
+#define V4L2_PIX_FMT_NV12_512         v4l2_fourcc('Q', '5', '1', '2')
+#define V4L2_PIX_FMT_NV12_UBWC        v4l2_fourcc('Q', '1', '2', '8')
+#define V4L2_PIX_FMT_NV12_TP10_UBWC   v4l2_fourcc('Q', '1', '2', 'A')
+#define V4L2_PIX_FMT_NV12_P010_UBWC   v4l2_fourcc('Q', '1', '2', 'B')
+#define V4L2_PIX_FMT_SBGGR10DPCM6 v4l2_fourcc('b', 'B', 'A', '6')
+#define V4L2_PIX_FMT_SGBRG10DPCM6 v4l2_fourcc('b', 'G', 'A', '6')
+#define V4L2_PIX_FMT_SGRBG10DPCM6 v4l2_fourcc('B', 'D', '1', '6')
+#define V4L2_PIX_FMT_SRGGB10DPCM6 v4l2_fourcc('b', 'R', 'A', '6')
+#define V4L2_PIX_FMT_SBGGRPLAIN16 v4l2_fourcc('B', 'G', '1', '6')
+#define V4L2_PIX_FMT_SGBRGPLAIN16 v4l2_fourcc('G', 'B', '1', '6')
+#define V4L2_PIX_FMT_SGRBGPLAIN16 v4l2_fourcc('G', 'R', '1', '6')
+#define V4L2_PIX_FMT_SRGGBPLAIN16 v4l2_fourcc('R', 'G', '1', '6')
+#define V4L2_PIX_FMT_DIVX_311  v4l2_fourcc('D', 'I', 'V', '3') /* DIVX311     */
+#define V4L2_PIX_FMT_DIVX      v4l2_fourcc('D', 'I', 'V', 'X') /* DIVX  */
+#define V4L2_PIX_FMT_HEVC_HYBRID v4l2_fourcc('H', 'V', 'C', 'H')
+#define V4L2_PIX_FMT_TME      v4l2_fourcc('T', 'M', 'E', '0') /* TME stream */
+#define V4L2_PIX_FMT_CVP      v4l2_fourcc('C', 'V', 'P', '0') /* CVP stream */
+#define V4L2_PIX_FMT_SDE_ABGR_8888 \
+	v4l2_fourcc('R', 'A', '2', '4') /* 32-bit ABGR 8:8:8:8 */
+#define V4L2_PIX_FMT_SDE_RGBA_8888 \
+	v4l2_fourcc('A', 'B', '2', '4') /* 32-bit RGBA 8:8:8:8 */
+#define V4L2_PIX_FMT_SDE_RGBX_8888 \
+	v4l2_fourcc('X', 'B', '2', '4') /* 32-bit RGBX 8:8:8:8 */
+#define V4L2_PIX_FMT_SDE_XBGR_8888 \
+	v4l2_fourcc('R', 'X', '2', '4') /* 32-bit XBGR 8:8:8:8 */
+#define V4L2_PIX_FMT_SDE_RGBA_5551 \
+	v4l2_fourcc('R', 'A', '1', '5') /* 16-bit RGBA 5:5:5:1 */
+#define V4L2_PIX_FMT_SDE_ABGR_1555 \
+	v4l2_fourcc('A', 'B', '1', '5') /* 16-bit ABGR 1:5:5:5 */
+#define V4L2_PIX_FMT_SDE_BGRA_5551 \
+	v4l2_fourcc('B', 'A', '1', '5') /* 16-bit BGRA 5:5:5:1 */
+#define V4L2_PIX_FMT_SDE_BGRX_5551 \
+	v4l2_fourcc('B', 'X', '1', '5') /* 16-bit BGRX 5:5:5:1 */
+#define V4L2_PIX_FMT_SDE_RGBX_5551 \
+	v4l2_fourcc('R', 'X', '1', '5') /* 16-bit RGBX 5:5:5:1 */
+#define V4L2_PIX_FMT_SDE_XBGR_1555 \
+	v4l2_fourcc('X', 'B', '1', '5') /* 16-bit XBGR 1:5:5:5 */
+#define V4L2_PIX_FMT_SDE_RGBA_4444 \
+	v4l2_fourcc('R', 'A', '1', '2') /* 16-bit RGBA 4:4:4:4 */
+#define V4L2_PIX_FMT_SDE_BGRA_4444 \
+	v4l2_fourcc('b', 'A', '1', '2') /* 16-bit BGRA 4:4:4:4 */
+#define V4L2_PIX_FMT_SDE_ABGR_4444 \
+	v4l2_fourcc('A', 'B', '1', '2') /* 16-bit ABGR 4:4:4:4 */
+#define V4L2_PIX_FMT_SDE_RGBX_4444 \
+	v4l2_fourcc('R', 'X', '1', '2') /* 16-bit RGBX 4:4:4:4 */
+#define V4L2_PIX_FMT_SDE_BGRX_4444 \
+	v4l2_fourcc('B', 'X', '1', '2') /* 16-bit BGRX 4:4:4:4 */
+#define V4L2_PIX_FMT_SDE_XBGR_4444 \
+	v4l2_fourcc('X', 'B', '1', '2') /* 16-bit XBGR 4:4:4:4 */
+#define V4L2_PIX_FMT_SDE_BGR_565 \
+	v4l2_fourcc('B', 'G', '1', '6') /* 16-bit BGR 5:6:5 */
+#define V4L2_PIX_FMT_SDE_Y_CR_CB_GH2V2 \
+	v4l2_fourcc('Y', 'U', '4', '2') /* Planar YVU 4:2:0 A16 */
+#define V4L2_PIX_FMT_SDE_Y_CBCR_H1V2 \
+	v4l2_fourcc('N', 'H', '1', '6') /* Y/CbCr 4:2:2 */
+#define V4L2_PIX_FMT_SDE_Y_CRCB_H1V2 \
+	v4l2_fourcc('N', 'H', '6', '1') /* Y/CrCb 4:2:2 */
+#define V4L2_PIX_FMT_SDE_Y_CBCR_H2V2_VENUS \
+	v4l2_fourcc('Q', 'N', 'V', '2') /* Y/CbCr 4:2:0 Venus */
+#define V4L2_PIX_FMT_SDE_Y_CRCB_H2V2_VENUS \
+	v4l2_fourcc('Q', 'N', 'V', '1') /* Y/CrCb 4:2:0 Venus */
+#define V4L2_PIX_FMT_SDE_RGBX_8888_UBWC \
+	v4l2_fourcc('Q', 'X', 'B', '4') /* RGBX 8:8:8:8 UBWC */
+#define V4L2_PIX_FMT_SDE_RGB_565_UBWC \
+	v4l2_fourcc('Q', 'R', 'G', '6') /* RGB 5:6:5 UBWC */
+#define V4L2_PIX_FMT_SDE_RGBA_1010102 \
+	v4l2_fourcc('A', 'B', '3', '0') /* RGBA 10:10:10:2 */
+#define V4L2_PIX_FMT_SDE_RGBX_1010102 \
+	v4l2_fourcc('X', 'B', '3', '0') /* RGBX 10:10:10:2 */
+#define V4L2_PIX_FMT_SDE_ARGB_2101010 \
+	v4l2_fourcc('A', 'R', '3', '0') /* ARGB 2:10:10:10 */
+#define V4L2_PIX_FMT_SDE_XRGB_2101010 \
+	v4l2_fourcc('X', 'R', '3', '0') /* XRGB 2:10:10:10 */
+#define V4L2_PIX_FMT_SDE_BGRA_1010102 \
+	v4l2_fourcc('B', 'A', '3', '0') /* BGRA 10:10:10:2 */
+#define V4L2_PIX_FMT_SDE_BGRX_1010102 \
+	v4l2_fourcc('B', 'X', '3', '0') /* BGRX 10:10:10:2 */
+#define V4L2_PIX_FMT_SDE_ABGR_2101010 \
+	v4l2_fourcc('R', 'A', '3', '0') /* ABGR 2:10:10:10 */
+#define V4L2_PIX_FMT_SDE_XBGR_2101010 \
+	v4l2_fourcc('R', 'X', '3', '0') /* XBGR 2:10:10:10 */
+#define V4L2_PIX_FMT_SDE_RGBA_1010102_UBWC \
+	v4l2_fourcc('Q', 'R', 'B', 'A') /* RGBA 10:10:10:2 UBWC */
+#define V4L2_PIX_FMT_SDE_RGBX_1010102_UBWC \
+	v4l2_fourcc('Q', 'X', 'B', 'A') /* RGBX 10:10:10:2 UBWC */
+#define V4L2_PIX_FMT_SDE_Y_CBCR_H2V2_TP10 \
+	v4l2_fourcc('T', 'P', '1', '0') /* Y/CbCr 4:2:0 TP10 */
+#define V4L2_PIX_FMT_SDE_Y_CBCR_H2V2_P010 \
+	v4l2_fourcc('P', '0', '1', '0') /* Y/CbCr 4:2:0 P10 */
+#define V4L2_PIX_FMT_SDE_Y_CBCR_H2V2_P010_VENUS \
+	v4l2_fourcc('Q', 'P', '1', '0') /* Y/CbCr 4:2:0 P10 Venus*/
+#define V4L2_BUF_FLAG_CODECCONFIG		0x00020000
+#define V4L2_BUF_FLAG_END_OF_SUBFRAME		0x00000080
+#define V4L2_BUF_FLAG_DATA_CORRUPT		0x00400000
+#define V4L2_BUF_INPUT_UNSUPPORTED		0x01000000
+#define V4L2_BUF_FLAG_EOS			0x02000000
+#define V4L2_BUF_FLAG_READONLY		0x04000000
+#define V4L2_BUF_FLAG_PERF_MODE		0x20000000
+#define V4L2_BUF_FLAG_CVPMETADATA_SKIP		0x40000000
+#define V4L2_QCOM_BUF_FLAG_EOSEQ                0x00040000
+#define V4L2_QCOM_BUF_TIMESTAMP_INVALID         0x00080000
+#define V4L2_MSM_BUF_FLAG_MBAFF                 0x00000200
+#define V4L2_QCOM_BUF_FLAG_DECODEONLY           0x00200000
+#define V4L2_QCOM_BUF_DROP_FRAME                0x00800000
+#define V4L2_MSM_VIDC_BUF_START_CODE_NOT_FOUND  0x08000000
+#define V4L2_MSM_BUF_FLAG_YUV_601_709_CLAMP     0x10000000
+#define V4L2_MSM_BUF_FLAG_DEFER                 0x40000000
+#define V4L2_QCOM_BUF_FLAG_IDRFRAME             0x80000000
+#define V4L2_QCOM_BUF_END_OF_SUBFRAME   V4L2_BUF_FLAG_END_OF_SUBFRAME
+#define V4L2_QCOM_BUF_FLAG_CODECCONFIG  V4L2_BUF_FLAG_CODECCONFIG
+#define V4L2_QCOM_BUF_INPUT_UNSUPPORTED V4L2_BUF_INPUT_UNSUPPORTED
+#define V4L2_QCOM_BUF_FLAG_EOS	V4L2_BUF_FLAG_EOS
+#define V4L2_QCOM_BUF_FLAG_READONLY V4L2_BUF_FLAG_READONLY
+#define V4L2_QCOM_BUF_FLAG_PERF_MODE	V4L2_BUF_FLAG_PERF_MODE
+#define V4L2_CMD_FLUSH      (4)
+#define V4L2_CMD_SESSION_CONTINUE (5)
+#define V4L2_DEC_QCOM_CMD_RECONFIG_HINT  (6)
+#define V4L2_CMD_FLUSH_OUTPUT  (1 << 0)
+#define V4L2_CMD_FLUSH_CAPTURE (1 << 1)
+#define V4L2_QCOM_CMD_FLUSH	V4L2_CMD_FLUSH
+#define V4L2_QCOM_CMD_SESSION_CONTINUE	V4L2_CMD_SESSION_CONTINUE
+#define V4L2_QCOM_CMD_FLUSH_OUTPUT	V4L2_CMD_FLUSH_OUTPUT
+#define V4L2_QCOM_CMD_FLUSH_CAPTURE	V4L2_CMD_FLUSH_CAPTURE
+#define V4L2_EVENT_BITDEPTH_FLAG	0x1
+#define V4L2_EVENT_PICSTRUCT_FLAG	0x2
+#define V4L2_EVENT_COLOUR_SPACE_FLAG	0x4
+#define V4L2_EVENT_MSM_VIDC_START	(V4L2_EVENT_PRIVATE_START + 0x00001000)
+#define V4L2_EVENT_MSM_VIDC_FLUSH_DONE	(V4L2_EVENT_MSM_VIDC_START + 1)
+#define V4L2_EVENT_MSM_VIDC_PORT_SETTINGS_CHANGED_SUFFICIENT	\
+		(V4L2_EVENT_MSM_VIDC_START + 2)
+#define V4L2_EVENT_MSM_VIDC_PORT_SETTINGS_CHANGED_INSUFFICIENT	\
+		(V4L2_EVENT_MSM_VIDC_START + 3)
+#define V4L2_EVENT_MSM_VIDC_PORT_SETTINGS_BITDEPTH_CHANGED_INSUFFICIENT \
+		(V4L2_EVENT_MSM_VIDC_START + 4)
+#define V4L2_EVENT_MSM_VIDC_SYS_ERROR	(V4L2_EVENT_MSM_VIDC_START + 5)
+#define V4L2_EVENT_MSM_VIDC_RELEASE_BUFFER_REFERENCE \
+		(V4L2_EVENT_MSM_VIDC_START + 6)
+#define V4L2_EVENT_MSM_VIDC_RELEASE_UNQUEUED_BUFFER \
+		(V4L2_EVENT_MSM_VIDC_START + 7)
+#define V4L2_EVENT_MSM_VIDC_HW_OVERLOAD (V4L2_EVENT_MSM_VIDC_START + 8)
+#define V4L2_EVENT_MSM_VIDC_MAX_CLIENTS (V4L2_EVENT_MSM_VIDC_START + 9)
+#define V4L2_EVENT_MSM_VIDC_HW_UNSUPPORTED (V4L2_EVENT_MSM_VIDC_START + 10)
+#define V4L2_EVENT_MSM_VIDC_REGISTER_BUFFER_DONE \
+		(V4L2_EVENT_MSM_VIDC_START + 11)
+#define V4L2_EVENT_MSM_VIDC_UNREGISTER_BUFFER_DONE \
+		(V4L2_EVENT_MSM_VIDC_START + 12)
+#define V4L2_EVENT_MSM_CVP_START	(V4L2_EVENT_PRIVATE_START + 0x00001000)
+#define V4L2_EVENT_MSM_CVP_FLUSH_DONE	(V4L2_EVENT_MSM_CVP_START + 1)
+#define V4L2_EVENT_MSM_CVP_PORT_SETTINGS_CHANGED_SUFFICIENT	\
+		(V4L2_EVENT_MSM_CVP_START + 2)
+#define V4L2_EVENT_MSM_CVP_PORT_SETTINGS_CHANGED_INSUFFICIENT	\
+		(V4L2_EVENT_MSM_CVP_START + 3)
+#define V4L2_EVENT_MSM_CVP_SYS_ERROR	(V4L2_EVENT_MSM_CVP_START + 5)
+#define V4L2_EVENT_MSM_CVP_RELEASE_BUFFER_REFERENCE \
+		(V4L2_EVENT_MSM_CVP_START + 6)
+#define V4L2_EVENT_MSM_CVP_RELEASE_UNQUEUED_BUFFER \
+		(V4L2_EVENT_MSM_CVP_START + 7)
+#define V4L2_EVENT_MSM_CVP_HW_OVERLOAD (V4L2_EVENT_MSM_CVP_START + 8)
+#define V4L2_EVENT_MSM_CVP_MAX_CLIENTS (V4L2_EVENT_MSM_CVP_START + 9)
+#define V4L2_EVENT_MSM_CVP_HW_UNSUPPORTED (V4L2_EVENT_MSM_CVP_START + 10)
+#define V4L2_EVENT_MSM_CVP_REGISTER_BUFFER_DONE \
+		(V4L2_EVENT_MSM_CVP_START + 11)
+#define V4L2_EVENT_MSM_CVP_UNREGISTER_BUFFER_DONE \
+		(V4L2_EVENT_MSM_CVP_START + 12)
+#define BASE_VIDIOC_PRIVATE_VIDEO	(BASE_VIDIOC_PRIVATE + 0)
+#define BASE_VIDIOC_PRIVATE_CVP	(BASE_VIDIOC_PRIVATE + 1)
+#endif /* __KERNEL__ */
+
 #endif /* _UAPI__LINUX_VIDEODEV2_H */
