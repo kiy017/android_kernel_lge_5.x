@@ -91,7 +91,8 @@ menu "timelm vendor modules (android_kernel_lge_sm8250-modules)"
 
 # These build the out-of-tree vendor drivers as part of the normal kernel
 # "make modules": each directory below techpack/ is a symlink (or a small
-# wrapper with symlinks) into ../android_kernel_lge_sm8250-modules, which must sit next to this tree.  All of them are loadable
+# wrapper with symlinks) into ../sm8250-modules (the android_kernel_lge_sm8250-modules
+# repo), which must sit next to this tree.  All of them are loadable
 # modules that will live in /vendor/lib/modules once the port is done.
 
 config TIMELM_WLAN
