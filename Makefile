@@ -1212,9 +1212,9 @@ export MODULES_NSDEPS := $(extmod_prefix)modules.nsdeps
 
 PHONY += headers
 
-# timelm: the vendor drivers are built from techpack/ (Elite audio, kona
+# timelm: the vendor drivers are built from techpack/ (Elite audio, KGSL, kona
 # video, LG camera/cvp), so export their uapi from there.
-ext-mod-dirs := techpack/audio/audio-kernel-elite techpack/camera techpack/cvp techpack/display techpack/video
+ext-mod-dirs := techpack/audio/audio-kernel-elite techpack/camera techpack/cvp techpack/display techpack/kgsl/graphics-kernel techpack/video
 
 #Default location for installed headers
 ifeq ($(KBUILD_EXTMOD),)
