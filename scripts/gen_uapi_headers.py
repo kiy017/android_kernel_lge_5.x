@@ -9,9 +9,9 @@ scripts/Makefile.headersinst, the asm-generic wrappers follow
 scripts/Makefile.asm-generic, arm's unistd-{oabi,eabi}.h come from
 scripts/syscallhdr.sh and linux/version.h from the top-level Makefile.
 
-As bionic does for its kernel headers, struct sigaction is renamed to struct
-__kernel_sigaction and __unused to __linux_unused, so the headers can be used
-next to bionic's <signal.h> and <sys/cdefs.h>.
+headers_install.sh renames struct sigaction to struct __kernel_sigaction and
+__unused to __linux_unused, as bionic does for its kernel headers, so the
+headers can be used next to bionic's <signal.h> and <sys/cdefs.h>.
 
   --bp              print gen_headers_<arch>.bp (the Soong genrule and its
                     output list); rerun when headers are added or removed
@@ -139,12 +139,6 @@ def version_h(src):
             % (code, v['VERSION'], v['PATCHLEVEL'], v['SUBLEVEL']))
 
 
-SCRUB = [
-    (re.compile(r'(^|[^a-zA-Z0-9_])__unused([^a-zA-Z0-9_]|$)', re.M), r'\1__linux_unused\2'),
-    (re.compile(r'struct sigaction'), 'struct __kernel_sigaction'),
-]
-
-
 def generate(src, arch, gen_dir, unifdef, outs):
     src = os.path.abspath(src)
     entries = plan(src, arch)
@@ -182,14 +176,6 @@ def generate(src, arch, gen_dir, unifdef, outs):
                                        '--offset', '__NR_SYSCALL_BASE', tbl, infile],
                                       cwd=work)
             subprocess.check_call(['sh', hi, infile, dst], cwd=work)
-        for rel in entries:
-            p = os.path.join(gen_dir, rel)
-            with open(p) as f:
-                text = f.read()
-            for pat, rep in SCRUB:
-                text = pat.sub(rep, text)
-            with open(p, 'w') as f:
-                f.write(text)
     finally:
         shutil.rmtree(work)
 
