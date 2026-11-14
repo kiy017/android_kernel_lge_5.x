@@ -728,6 +728,7 @@ genrule {
         "linux/rio_cm_cdev.h",
         "linux/rio_mport_cdev.h",
         "linux/rkisp1-config.h",
+        "linux/rmnet_data.h",
         "linux/rmnet_ipa_fd_ioctl.h",
         "linux/romfs_fs.h",
         "linux/rose.h",
