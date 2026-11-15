@@ -500,6 +500,15 @@
 };
 
 /*
+ * Second USB controller: stock uses it only as the HS host for the LG Dual
+ * Screen accessory (lge_usb_ds3), which is not ported.  Enabled, dwc3-msm
+ * holds an a800000.ssusb wakeup source from boot and the phone never suspends.
+ */
+&usb1 {
+	status = "disabled";
+};
+
+/*
  * QCA6390 Wi-Fi (cnss2) on PCIe RC0.  Values from the live V60 DT
  * (v60-live.dts wlan: qcom,cnss-qca6390@b0000000), written in the 5.15
  * binding of wlan/kona-iot-vc-cnss.dtsi.  Rails checked against the live DT:
