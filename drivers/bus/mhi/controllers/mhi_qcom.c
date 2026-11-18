@@ -510,7 +510,7 @@ static const struct mhi_pci_dev_info mhi_qcom_sdx55_info = {
 	.skip_forced_suspend = true,
 	.sfr_support = true,
 	.timesync = false,
-	.drv_support = false,
+	.drv_support = true,
 };
 
 static const struct mhi_pci_dev_info mhi_qcom_sdx65_info = {
@@ -891,7 +891,14 @@ static int mhi_runtime_suspend(struct device *dev)
 		return 0;
 	}
 
-	ret = mhi_pm_suspend(mhi_cntrl);
+	/* if drv is connected we will always go into drv */
+	if (mhi_priv->drv_connected) {
+		ret = mhi_pm_fast_suspend(mhi_cntrl, true);
+		mhi_priv->suspend_mode = MHI_FAST_LINK_OFF;
+	} else {
+		ret = mhi_pm_suspend(mhi_cntrl);
+		mhi_priv->suspend_mode = MHI_DEFAULT_SUSPEND;
+	}
 
 	if (ret) {
 		MHI_CNTRL_LOG("Abort due to ret: %d\n", ret);
@@ -899,14 +906,15 @@ static int mhi_runtime_suspend(struct device *dev)
 		goto exit_runtime_suspend;
 	}
 
-	mhi_priv->suspend_mode = MHI_DEFAULT_SUSPEND;
-
 	ret = mhi_arch_link_suspend(mhi_cntrl);
 
 	/* failed suspending link abort mhi suspend */
 	if (ret) {
 		MHI_CNTRL_LOG("Failed to suspend link, abort suspend\n");
-		mhi_pm_resume(mhi_cntrl);
+		if (mhi_priv->suspend_mode == MHI_DEFAULT_SUSPEND)
+			mhi_pm_resume(mhi_cntrl);
+		else
+			mhi_pm_fast_resume(mhi_cntrl, true);
 		mhi_priv->suspend_mode = MHI_ACTIVE_STATE;
 	}
 
@@ -963,7 +971,8 @@ static int mhi_runtime_resume(struct device *dev)
 	if (mhi_priv->suspend_mode == MHI_DEFAULT_SUSPEND)
 		ret = mhi_pm_resume(mhi_cntrl);
 	else
-		ret = mhi_pm_fast_resume(mhi_cntrl, MHI_FAST_LINK_ON);
+		ret = mhi_pm_fast_resume(mhi_cntrl,
+				mhi_priv->suspend_mode == MHI_FAST_LINK_OFF);
 
 	mhi_priv->suspend_mode = MHI_ACTIVE_STATE;
 
@@ -1013,6 +1022,10 @@ int mhi_system_suspend(struct device *dev)
 		 */
 		ret = mhi_pm_fast_suspend(mhi_cntrl, false);
 		mhi_priv->suspend_mode = MHI_FAST_LINK_ON;
+	} else if (mhi_priv->drv_connected) {
+		/* if drv is connected always do fast suspend */
+		ret = mhi_pm_fast_suspend(mhi_cntrl, true);
+		mhi_priv->suspend_mode = MHI_FAST_LINK_OFF;
 	} else {
 		/* try normal suspend */
 		mhi_priv->suspend_mode = MHI_DEFAULT_SUSPEND;
@@ -1045,7 +1058,8 @@ int mhi_system_suspend(struct device *dev)
 		if (mhi_priv->suspend_mode == MHI_DEFAULT_SUSPEND)
 			mhi_pm_resume(mhi_cntrl);
 		else
-			mhi_pm_fast_resume(mhi_cntrl, MHI_FAST_LINK_OFF);
+			mhi_pm_fast_resume(mhi_cntrl,
+				mhi_priv->suspend_mode == MHI_FAST_LINK_OFF);
 
 		mhi_priv->suspend_mode = MHI_ACTIVE_STATE;
 	}
@@ -1189,7 +1203,8 @@ static void mhi_status_cb(struct mhi_controller *mhi_cntrl,
 			pm_runtime_put(dev);
 		}
 		mhi_arch_mission_mode_enter(mhi_cntrl);
-		pm_runtime_allow(dev);
+		if (!dev_info->drv_support || mhi_priv->drv_connected)
+			pm_runtime_allow(dev);
 		break;
 	default:
 		MHI_CNTRL_LOG("Unhandled cb: 0x%x\n", reason);

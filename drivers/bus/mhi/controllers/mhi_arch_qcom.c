@@ -117,6 +117,32 @@ static void mhi_arch_pci_link_state_cb(struct msm_pcie_notify *notify)
 		pm_runtime_mark_last_busy(mhi_cntrl->cntrl_dev);
 		pm_request_autosuspend(mhi_cntrl->cntrl_dev);
 		break;
+	case MSM_PCIE_EVENT_DRV_CONNECT:
+		/* drv is connected we can suspend now */
+		MHI_CNTRL_LOG("Received DRV_CONNECT signal\n");
+
+		mhi_priv->drv_connected = true;
+
+		mutex_lock(&mhi_cntrl->pm_mutex);
+
+		/* if we're in amss attempt a suspend */
+		if (mhi_priv->powered_on && mhi_cntrl->ee == MHI_EE_AMSS) {
+			pm_runtime_allow(mhi_cntrl->cntrl_dev);
+			pm_runtime_mark_last_busy(mhi_cntrl->cntrl_dev);
+			pm_request_autosuspend(mhi_cntrl->cntrl_dev);
+		}
+		mutex_unlock(&mhi_cntrl->pm_mutex);
+		break;
+	case MSM_PCIE_EVENT_DRV_DISCONNECT:
+		MHI_CNTRL_LOG("Received DRV_DISCONNECT signal\n");
+
+		/*
+		 * if link suspended bring it out of suspend and disable runtime
+		 * suspend
+		 */
+		mhi_priv->drv_connected = false;
+		pm_runtime_forbid(mhi_cntrl->cntrl_dev);
+		break;
 	default:
 		MHI_CNTRL_LOG("Unhandled event: 0x%x\n", notify->event);
 	}
@@ -496,6 +522,11 @@ int mhi_arch_pcie_init(struct mhi_controller *mhi_cntrl)
 			(MSM_PCIE_EVENT_WAKEUP) :
 			(MSM_PCIE_EVENT_WAKEUP | MSM_PCIE_EVENT_L1SS_TIMEOUT);
 
+		/* if drv supported register for drv connection events */
+		if (dev_info->drv_support)
+			reg_event->events |= MSM_PCIE_EVENT_DRV_CONNECT |
+				MSM_PCIE_EVENT_DRV_DISCONNECT;
+
 		reg_event->user = pci_dev;
 		reg_event->callback = mhi_arch_pci_link_state_cb;
 		reg_event->notify.data = mhi_cntrl;
@@ -565,6 +596,44 @@ int mhi_arch_pcie_init(struct mhi_controller *mhi_cntrl)
 					cur_link_info->target_link_speed);
 }
 
+static int mhi_arch_drv_suspend(struct mhi_controller *mhi_cntrl)
+{
+	struct pci_dev *pci_dev = to_pci_dev(mhi_cntrl->cntrl_dev);
+	struct mhi_link_info link_info, *cur_link_info;
+	bool bw_switched = false;
+	int ret;
+
+	cur_link_info = &mhi_cntrl->mhi_link_info;
+	/* if link is not in gen 1 we need to switch to gen 1 */
+	if (cur_link_info->target_link_speed != PCI_EXP_LNKSTA_CLS_2_5GB) {
+		link_info.target_link_speed = PCI_EXP_LNKSTA_CLS_2_5GB;
+		link_info.target_link_width = cur_link_info->target_link_width;
+
+		ret = msm_pcie_set_link_bandwidth(pci_dev,
+						  link_info.target_link_speed,
+						  link_info.target_link_width);
+		if (ret) {
+			MHI_CNTRL_ERR("Failed to switch Gen1 speed\n");
+			return -EBUSY;
+		}
+
+		/* no DDR votes when doing a drv suspend */
+		mhi_arch_set_bus_request(mhi_cntrl, 0);
+		bw_switched = true;
+	}
+
+	/* do a drv hand off */
+	ret = msm_pcie_pm_control(MSM_PCIE_DRV_SUSPEND, pci_dev->bus->number,
+				  pci_dev, NULL, mhi_cntrl->wake_set ?
+				  MSM_PCIE_CONFIG_NO_L1SS_TO : 0);
+
+	/* failed to suspend and scaled down pcie bw, need to scale up again */
+	if (ret && bw_switched)
+		mhi_arch_pcie_scale_bw(mhi_cntrl, pci_dev, cur_link_info);
+
+	return ret;
+}
+
 int mhi_arch_link_suspend(struct mhi_controller *mhi_cntrl)
 {
 	struct mhi_qcom_priv *mhi_priv = mhi_controller_get_privdata(mhi_cntrl);
@@ -604,6 +673,8 @@ int mhi_arch_link_suspend(struct mhi_controller *mhi_cntrl)
 		mhi_arch_set_bus_request(mhi_cntrl, 0);
 		break;
 	case MHI_FAST_LINK_OFF:
+		ret = mhi_arch_drv_suspend(mhi_cntrl);
+		break;
 	case MHI_ACTIVE_STATE:
 	case MHI_FAST_LINK_ON:/* keeping link on do nothing */
 	default:
@@ -667,6 +738,7 @@ int mhi_arch_link_resume(struct mhi_controller *mhi_cntrl)
 	struct mhi_qcom_priv *mhi_priv = mhi_controller_get_privdata(mhi_cntrl);
 	struct pci_dev *pci_dev = to_pci_dev(mhi_cntrl->cntrl_dev);
 	const struct mhi_pci_dev_info *dev_info = mhi_priv->dev_info;
+	struct mhi_link_info *cur_info = &mhi_cntrl->mhi_link_info;
 	int ret = 0;
 
 	MHI_CNTRL_LOG("Entered with suspend_mode: %s\n",
@@ -680,6 +752,27 @@ int mhi_arch_link_resume(struct mhi_controller *mhi_cntrl)
 		ret = __mhi_arch_link_resume(mhi_cntrl);
 		break;
 	case MHI_FAST_LINK_OFF:
+		ret = msm_pcie_pm_control(MSM_PCIE_RESUME, pci_dev->bus->number,
+					  pci_dev, NULL, 0);
+		if (ret)
+			break;
+
+		if (cur_info->target_link_speed == PCI_EXP_LNKSTA_CLS_2_5GB) {
+			mhi_arch_set_bus_request(mhi_cntrl,
+						 cur_info->target_link_speed);
+			break;
+		}
+
+		/*
+		 * BW request from device isn't for gen 1 link speed, we can
+		 * only print an error here.
+		 */
+		if (mhi_arch_pcie_scale_bw(mhi_cntrl, pci_dev, cur_info))
+			MHI_CNTRL_ERR(
+			"Failed to honor bw request: speed:0x%x width:0x%x\n",
+			cur_info->target_link_speed,
+			cur_info->target_link_width);
+		break;
 	case MHI_ACTIVE_STATE:
 	case MHI_FAST_LINK_ON:
 	default:
