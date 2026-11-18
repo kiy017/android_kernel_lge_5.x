@@ -1972,8 +1972,8 @@ static void call_console_drivers(const char *ext_text, size_t ext_len,
 			continue;
 		if (!con->write)
 			continue;
-		/* DEBUG(timelm): below console_loglevel only pstore gets it */
-		if (pstore_only && strcmp(con->name, "pstore"))
+		/* DEBUG(timelm): below console_loglevel only ramoops gets it */
+		if (pstore_only && strcmp(con->name, "ramoops"))
 			continue;
 		if (!cpu_online(smp_processor_id()) &&
 		    !(con->flags & CON_ANYTIME))
