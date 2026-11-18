@@ -556,6 +556,10 @@ static void pstore_console_write(struct console *con, const char *s, unsigned c)
 	if (strnstr(s, " avc:  ", c))
 		return;
 
+	/* img163: the qseecom listener trace would evict the suspend log */
+	if (strnstr(s, "QSEECOMDBG", c))
+		return;
+
 	pstore_record_init(&record, psinfo);
 	record.type = PSTORE_TYPE_CONSOLE;
 
