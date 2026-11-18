@@ -498,6 +498,8 @@ power_attr(pm_print_times);
 static inline void pm_print_times_init(void)
 {
 	pm_print_times_enabled = !!initcall_debug;
+	/* DEBUG(timelm): log every device PM callback (img162 suspend reset) */
+	pm_print_times_enabled = true;
 }
 
 static ssize_t pm_wakeup_irq_show(struct kobject *kobj,
@@ -512,7 +514,8 @@ static ssize_t pm_wakeup_irq_show(struct kobject *kobj,
 
 power_attr_ro(pm_wakeup_irq);
 
-bool pm_debug_messages_on __read_mostly;
+/* DEBUG(timelm): on by default (img162 suspend reset) */
+bool pm_debug_messages_on __read_mostly = true;
 
 static ssize_t pm_debug_messages_show(struct kobject *kobj,
 				      struct kobj_attribute *attr, char *buf)

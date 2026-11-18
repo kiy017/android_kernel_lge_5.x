@@ -1947,7 +1947,7 @@ static int console_trylock_spinning(void)
  * The console_lock must be held.
  */
 static void call_console_drivers(const char *ext_text, size_t ext_len,
-				 const char *text, size_t len)
+				 const char *text, size_t len, bool pstore_only)
 {
 	static char dropped_text[64];
 	size_t dropped_len = 0;
@@ -1971,6 +1971,9 @@ static void call_console_drivers(const char *ext_text, size_t ext_len,
 		if (!(con->flags & CON_ENABLED))
 			continue;
 		if (!con->write)
+			continue;
+		/* DEBUG(timelm): below console_loglevel only pstore gets it */
+		if (pstore_only && strcmp(con->name, "pstore"))
 			continue;
 		if (!cpu_online(smp_processor_id()) &&
 		    !(con->flags & CON_ANYTIME))
@@ -2364,7 +2367,7 @@ static ssize_t msg_print_ext_body(char *buf, size_t size,
 static void console_lock_spinning_enable(void) { }
 static int console_lock_spinning_disable_and_check(void) { return 0; }
 static void call_console_drivers(const char *ext_text, size_t ext_len,
-				 const char *text, size_t len) {}
+				 const char *text, size_t len, bool pstore_only) {}
 static bool suppress_message_printing(int level) { return false; }
 
 #endif /* CONFIG_PRINTK */
@@ -2720,8 +2723,8 @@ again:
 		size_t ext_len = 0;
 		int handover;
 		size_t len;
+		bool pstore_only;
 
-skip:
 		if (!prb_read_valid(prb, console_seq, &r))
 			break;
 
@@ -2730,15 +2733,12 @@ skip:
 			console_seq = r.info->seq;
 		}
 
-		if (suppress_message_printing(r.info->level)) {
-			/*
-			 * Skip record we have buffered and already printed
-			 * directly to the console when we received it, and
-			 * record that has level above the console loglevel.
-			 */
-			console_seq++;
-			goto skip;
-		}
+		/*
+		 * DEBUG(timelm): the ROM sets console_loglevel 0, so a reset in
+		 * suspend left nothing in the ramoops console (img162).  Keep
+		 * feeding pstore; the other consoles still honour the level.
+		 */
+		pstore_only = suppress_message_printing(r.info->level);
 
 		/* Output to all consoles once old messages replayed. */
 		if (unlikely(exclusive_console &&
@@ -2779,7 +2779,7 @@ skip:
 		console_lock_spinning_enable();
 
 		stop_critical_timings();	/* don't trace print latency */
-		call_console_drivers(ext_text, ext_len, text, len);
+		call_console_drivers(ext_text, ext_len, text, len, pstore_only);
 		start_critical_timings();
 
 		handover = console_lock_spinning_disable_and_check();
