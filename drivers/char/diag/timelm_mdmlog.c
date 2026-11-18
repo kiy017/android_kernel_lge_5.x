@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
  * DEBUG(timelm): keep the SDX55 DIAG stream in memory, there is no diag_mdlog
- * on this ROM. Asks the MDM for F3 messages and events while the channel is
- * open and appends all it sends to /sys/kernel/debug/timelm_mdmlog.
+ * on this ROM. Appends all the MDM sends to /sys/kernel/debug/timelm_mdmlog.
+ * No F3/event masks: they keep the SDX55 streaming and waking the AP.
  */
 
 #include <linux/debugfs.h>
@@ -45,11 +45,8 @@ struct timelm_mdmlog_rec {
 static const u8 timelm_mdmlog_cmds[][TIMELM_MDMLOG_MAX_CMD] = {
 	/* Liveness: the build id answer shows the MDM parses our commands. */
 	{ DIAG_CMD_EXT_BUILD },
-	/* All SSIDs, medium level and up. */
-	{ DIAG_CMD_MSG_CONFIG, DIAG_CMD_OP_SET_ALL_MSG_MASK, 0, 0, MSG_LVL_MED },
-	{ DIAG_CMD_EVENT_TOGGLE, 1 },
 };
-static const u8 timelm_mdmlog_cmd_len[] = { 1, 8, 2 };
+static const u8 timelm_mdmlog_cmd_len[] = { 1 };
 
 /* Written once and never changed, so overlapping writes of a frame are fine. */
 static u8 *timelm_mdmlog_frame[ARRAY_SIZE(timelm_mdmlog_cmds)];
@@ -133,7 +130,7 @@ void timelm_mdmlog_open(void)
 	/* A crash recovery opens the channel again: ask again, from the start. */
 	timelm_mdmlog_ticks_left = TIMELM_MDMLOG_TICKS;
 	mod_delayed_work(system_wq, &timelm_mdmlog_work, 0);
-	pr_info("TIMELMDIAG: MDM channel open, sending masks\n");
+	pr_info("TIMELMDIAG: MDM channel open\n");
 }
 
 void timelm_mdmlog_close(void)
