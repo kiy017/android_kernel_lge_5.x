@@ -519,6 +519,10 @@ static int __arm_smmu_tlb_sync(struct arm_smmu_device *smmu, int page,
 		goto out;
 
 	trace_tlbsync_timeout(smmu->dev);
+	/* TIMELMSMMU: the impl handler below can hang the board, log first */
+	pr_emerg("TIMELMSMMU: %s TLB sync timeout, page %d (cb %d)\n",
+		 dev_name(smmu->dev), page, page - (int)smmu->numpage);
+	dump_stack();
 	if (smmu->impl && smmu->impl->tlb_sync_timeout)
 		smmu->impl->tlb_sync_timeout(smmu);
 out:

@@ -2648,6 +2648,10 @@ static void qsmmuv500_tlb_sync_timeout(struct arm_smmu_device *smmu)
 	sync_inv_ack = arm_smmu_readl(smmu,
 				      ARM_SMMU_IMPL_DEF5,
 				      ARM_SMMU_STATS_SYNC_INV_TBU_ACK);
+	/* TIMELMSMMU: the SCM reads below can hang the board, log the acks first */
+	pr_emerg("TIMELMSMMU: TBU sync_inv_ack 0x%x (sync acked 0x%lx, inv acked 0x%lx)\n",
+		 sync_inv_ack, FIELD_GET(TBU_SYNC_ACK, sync_inv_ack),
+		 FIELD_GET(TBU_INV_ACK, sync_inv_ack));
 
 	if (sync_inv_ack) {
 		tbu_inv_pending = FIELD_GET(TBU_INV_REQ, sync_inv_ack);
