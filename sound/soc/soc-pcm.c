@@ -1285,6 +1285,23 @@ static void dpcm_be_reparent(struct snd_soc_pcm_runtime *fe,
 	}
 }
 
+/* undo dpcm_be_connect() forcing a BE nonatomic once no nonatomic FE uses it */
+static void dpcm_be_restore_atomicity(struct snd_soc_pcm_runtime *be)
+{
+	struct snd_soc_dpcm *dpcm;
+	int stream;
+
+	if (!be->pcm || be->pcm->nonatomic == be->dai_link->nonatomic)
+		return;
+
+	for_each_pcm_streams(stream)
+		for_each_dpcm_fe(be, stream, dpcm)
+			if (snd_soc_dpcm_get_substream(dpcm->fe, stream)->pcm->nonatomic)
+				return;
+
+	be->pcm->nonatomic = be->dai_link->nonatomic;
+}
+
 /* disconnect a BE and FE */
 void dpcm_be_disconnect(struct snd_soc_pcm_runtime *fe, int stream)
 {
@@ -1318,6 +1335,7 @@ void dpcm_be_disconnect(struct snd_soc_pcm_runtime *fe, int stream)
 		dpcm = list_first_entry(&deleted_dpcms, struct snd_soc_dpcm,
 					list_fe);
 		list_del(&dpcm->list_fe);
+		dpcm_be_restore_atomicity(dpcm->be);
 		dpcm_remove_debugfs_state(dpcm);
 		kfree(dpcm);
 	}
