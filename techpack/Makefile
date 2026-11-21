@@ -14,6 +14,7 @@ obj-$(CONFIG_TIMELM_CAMERA)		+= camera/
 obj-$(CONFIG_TIMELM_VIDEO)		+= video/
 obj-$(CONFIG_TIMELM_CVP)		+= cvp/
 obj-$(CONFIG_TIMELM_DATARMNET)		+= datarmnet/
+obj-$(CONFIG_TIMELM_DATAIPA)		+= dataipa/drivers/platform/msm/
 obj-$(CONFIG_TIMELM_AUDIO)		+= audio/
 obj-$(CONFIG_TIMELM_FINGERPRINT)	+= fingerprint/
 obj-$(CONFIG_TIMELM_NFC)		+= nfc/

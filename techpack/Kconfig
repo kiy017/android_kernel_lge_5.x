@@ -125,6 +125,10 @@ config TIMELM_DATARMNET
 	tristate "rmnet data over MHI (rmnet_core, rmnet_ctl)"
 	depends on m
 
+config TIMELM_DATAIPA
+	tristate "IPA v4.5 + GSI (dataipa: gsim, ipam, ipanetm, ipa_clientsm, rndisipam)"
+	depends on m && IPA3
+
 config TIMELM_AUDIO
 	tristate "Elite audio (LG 4.19 techpack/audio port, audio_*.ko)"
 	depends on m
